@@ -1,4 +1,4 @@
-import type { ValueType } from "@/pages/Index";
+import type { ValueType } from "@/entities/pipeline/model/types";
 
 export function detectValueType(values: string[]): ValueType {
   if (values.length === 0) return "categorical";
