@@ -1,17 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { detectValueType } from "@/lib/detectValueType";
+import { detectValueType } from "@/shared/lib/detectValueType";
 
 describe("detectValueType", () => {
   it("detects datetime for ISO dates", () => {
-    expect(detectValueType(["2024-01-01", "2024-06-15", "2023-12-31"])).toBe("datetime");
+    expect(detectValueType(["2024-01-01", "2024-06-15", "2023-12-31"])).toBe(
+      "datetime",
+    );
   });
 
   it("detects datetime for dd.mm.yyyy dates", () => {
-    expect(detectValueType(["01.01.2024", "15.06.2024", "31.12.2023"])).toBe("datetime");
+    expect(detectValueType(["01.01.2024", "15.06.2024", "31.12.2023"])).toBe(
+      "datetime",
+    );
   });
 
   it("detects quantitative for numbers", () => {
-    expect(detectValueType(["1", "2.5", "3", "100", "-5"])).toBe("quantitative");
+    expect(detectValueType(["1", "2.5", "3", "100", "-5"])).toBe(
+      "quantitative",
+    );
   });
 
   it("prefers datetime over quantitative for date strings", () => {
@@ -19,7 +25,9 @@ describe("detectValueType", () => {
   });
 
   it("detects ordinal for few unique string values", () => {
-    expect(detectValueType(["low", "medium", "high", "low", "high"])).toBe("ordinal");
+    expect(detectValueType(["low", "medium", "high", "low", "high"])).toBe(
+      "ordinal",
+    );
   });
 
   it("detects categorical for many unique strings", () => {
@@ -47,6 +55,8 @@ describe("detectValueType", () => {
     // Few unique strings -> ordinal
     expect(detectValueType(["a", "b", "c"])).toBe("ordinal");
     // Many unique strings -> categorical
-    expect(detectValueType(Array.from({ length: 10 }, (_, i) => `val${i}`))).toBe("categorical");
+    expect(
+      detectValueType(Array.from({ length: 10 }, (_, i) => `val${i}`)),
+    ).toBe("categorical");
   });
 });
