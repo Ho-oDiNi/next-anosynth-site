@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { parseCsv } from "@/shared/lib/csv";
+import { saveSourceCsvFile } from "@/shared/lib/source-csv-storage";
 import {
   readFileAsText,
   validateParsedCsv,
@@ -32,6 +33,12 @@ export function useCsvUpload({
         const parsedCsv = parseCsv(text);
 
         validateParsedCsv(parsedCsv.headers, parsedCsv.data);
+
+        try {
+          await saveSourceCsvFile(file);
+        } catch {
+          toast.warning("CSV загружен, но исходный файл не удалось сохранить локально");
+        }
 
         setHeaders(parsedCsv.headers);
         setData(parsedCsv.data);
