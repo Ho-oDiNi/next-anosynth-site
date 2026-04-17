@@ -1,9 +1,16 @@
 const DATABASE_NAME = "anosynthCsvDatabase";
 const DATABASE_VERSION = 2;
-const STORE_NAME = "sourceCsvFiles";
-const SOURCE_FILE_KEY = "latest-source-csv";
+const STORE_NAME = "testSplits";
+const TEST_SPLIT_KEY = "latest-test-split";
 
-function openSourceCsvDatabase(): Promise<IDBDatabase> {
+interface SaveTestSplitPayload {
+  headers: string[];
+  rows: string[][];
+  testSplit: number;
+  stratified: boolean;
+}
+
+function openTestSplitDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
       reject(new Error("IndexedDB недоступен в этой среде"));
@@ -15,12 +22,12 @@ function openSourceCsvDatabase(): Promise<IDBDatabase> {
     openRequest.onupgradeneeded = () => {
       const database = openRequest.result;
 
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME);
+      if (!database.objectStoreNames.contains("sourceCsvFiles")) {
+        database.createObjectStore("sourceCsvFiles");
       }
 
-      if (!database.objectStoreNames.contains("testSplits")) {
-        database.createObjectStore("testSplits");
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME);
       }
     };
 
@@ -57,13 +64,18 @@ function runStoreTransaction<T>(
   });
 }
 
-export async function saveSourceCsvFile(file: File): Promise<void> {
-  const database = await openSourceCsvDatabase();
+export async function saveTestSplit(payload: SaveTestSplitPayload): Promise<void> {
+  const database = await openTestSplitDatabase();
 
   try {
     await runStoreTransaction(database, "readwrite", (store) => {
-      store.clear();
-      store.put(file, SOURCE_FILE_KEY);
+      store.put(
+        {
+          ...payload,
+          updatedAt: new Date().toISOString(),
+        },
+        TEST_SPLIT_KEY,
+      );
     });
   } finally {
     database.close();
