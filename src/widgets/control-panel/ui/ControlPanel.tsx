@@ -85,6 +85,8 @@ export const ControlPanel = ({
   evaluationParams,
   onEvaluationParamsChange,
 }: ControlPanelProps) => {
+  const isCurrentStepValid =
+    activeStep === "generation" ? generationParams.method.trim() !== "" : true;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentMeta =
@@ -198,7 +200,7 @@ export const ControlPanel = ({
         onValueChange={(value) => onTabChange(value as StepName)}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <TabsList className="flex justify-between h-auto w-full rounded-none border-b border-border bg-secondary p-0">
+        <TabsList className="flex justify-between h-auto w-full rounded-none border-b border-border bg-secondary p-0 flex-wrap">
           {STEP_TABS.map((tab) => (
             <TabsTrigger
               key={tab.value}
@@ -345,13 +347,14 @@ export const ControlPanel = ({
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Метод
+                    Метод <span className="text-destructive">*</span>
                   </label>
                   <Select
                     value={generationParams.method}
                     onValueChange={(value) =>
                       updateGenerationParam("method", value)
                     }
+                    required
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Выберите метод" />
@@ -397,6 +400,26 @@ export const ControlPanel = ({
                     min={0}
                     max={100}
                     step={1}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Каскад
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={Math.max(1, data.length)}
+                    value={generationParams.cascade}
+                    onChange={(event) => {
+                      const cascadeLimit = Math.max(1, data.length);
+                      const cascadeValue = Math.min(
+                        Math.max(1, parseInt(event.target.value, 10) || 1),
+                        cascadeLimit,
+                      );
+
+                      updateGenerationParam("cascade", cascadeValue);
+                    }}
                   />
                 </div>
               </>
@@ -549,27 +572,6 @@ export const ControlPanel = ({
                     />
                   ))}
                 </CollapsibleSection>
-
-                <div className="mt-4 space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Каскад
-                  </label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={Math.max(1, data.length)}
-                    value={evaluationParams.cascade}
-                    onChange={(event) => {
-                      const limit = Math.max(1, data.length);
-                      const value = Math.min(
-                        Math.max(1, parseInt(event.target.value, 10) || 1),
-                        limit,
-                      );
-
-                      updateEvaluation("cascade", value);
-                    }}
-                  />
-                </div>
               </>
             )}
           </TabsContent>
@@ -592,7 +594,9 @@ export const ControlPanel = ({
           <div className="shrink-0 border-t border-border p-4">
             <Button
               onClick={onStepNext}
-              disabled={processing || isStepLocked(activeStep)}
+              disabled={
+                processing || isStepLocked(activeStep) || !isCurrentStepValid
+              }
               className="w-full gap-2"
             >
               {processing && <Loader2 className="h-4 w-4 animate-spin" />}

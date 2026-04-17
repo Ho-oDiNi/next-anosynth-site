@@ -1,6 +1,21 @@
-export type FeatureType = "direct-id" | "quasi-id" | "sensitive-id" | "other-id" | "";
-export type ValueType = "quantitative" | "categorical" | "ordinal" | "datetime" | "";
-export type MissingFill = "mean" | "median" | "most-frequent" | "delete-row" | "";
+export type FeatureType =
+  | "direct-id"
+  | "quasi-id"
+  | "sensitive-id"
+  | "other-id"
+  | "";
+export type ValueType =
+  | "quantitative"
+  | "categorical"
+  | "ordinal"
+  | "datetime"
+  | "";
+export type MissingFill =
+  | "mean"
+  | "median"
+  | "most-frequent"
+  | "delete-row"
+  | "";
 export type ColumnRole = "feature" | "target";
 
 export interface ColumnMeta {
@@ -14,6 +29,7 @@ export interface GenerationParams {
   method: string;
   recordCount: number;
   testSplit: number;
+  cascade: number;
 }
 
 export interface EvaluationParams {
@@ -36,12 +52,22 @@ export interface EvaluationParams {
   dataLeakage: { linear: boolean; xgboost: boolean; mlp: boolean };
   deltaPresence: boolean;
   domias: { kde: boolean; prior: boolean; bnaf: boolean };
-  cascade: number;
 }
 
-export type StepName = "preprocessing" | "generation" | "postprocessing" | "evaluation" | "results";
+export type StepName =
+  | "preprocessing"
+  | "generation"
+  | "postprocessing"
+  | "evaluation"
+  | "results";
 
-export const STEPS: StepName[] = ["preprocessing", "generation", "postprocessing", "evaluation", "results"];
+export const STEPS: StepName[] = [
+  "preprocessing",
+  "generation",
+  "postprocessing",
+  "evaluation",
+  "results",
+];
 
 export const defaultEvaluation: EvaluationParams = {
   tstr: { linear: false, xgboost: false, mlp: false },
@@ -63,7 +89,6 @@ export const defaultEvaluation: EvaluationParams = {
   dataLeakage: { linear: false, xgboost: false, mlp: false },
   deltaPresence: false,
   domias: { kde: false, prior: false, bnaf: false },
-  cascade: 1,
 };
 
 export function getStepLabel(step: StepName): string {

@@ -72,10 +72,10 @@ export function CsvHeaderCell({
               valueLabel ||
               meta?.missingFill ||
               meta?.role === "target") && (
-              <div className="mt-1 flex flex-wrap gap-1">
+              <div className="mt-1 flex gap-1">
                 {featureLabel && (
                   <span
-                    className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${featureLabel.color}`}
+                    className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium bg-purple-500/20 text-purple-300`}
                   >
                     {featureLabel.label}
                   </span>
@@ -83,7 +83,7 @@ export function CsvHeaderCell({
 
                 {valueLabel && (
                   <span
-                    className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium ${valueLabel.color}`}
+                    className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500/20 text-emerald-300`}
                   >
                     {valueLabel.label}
                   </span>

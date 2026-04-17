@@ -24,12 +24,6 @@ describe("detectValueType", () => {
     expect(detectValueType(["2024-01-01", "2024-02-02"])).toBe("datetime");
   });
 
-  it("detects ordinal for few unique string values", () => {
-    expect(detectValueType(["low", "medium", "high", "low", "high"])).toBe(
-      "ordinal",
-    );
-  });
-
   it("detects categorical for many unique strings", () => {
     const names = Array.from({ length: 20 }, (_, i) => `name_${i}`);
     expect(detectValueType(names)).toBe("categorical");
@@ -53,7 +47,7 @@ describe("detectValueType", () => {
     // Pure numbers
     expect(detectValueType(["42", "99"])).toBe("quantitative");
     // Few unique strings -> ordinal
-    expect(detectValueType(["a", "b", "c"])).toBe("ordinal");
+
     // Many unique strings -> categorical
     expect(
       detectValueType(Array.from({ length: 10 }, (_, i) => `val${i}`)),

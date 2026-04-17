@@ -7,7 +7,7 @@ import { splitDataset } from "@/entities/pipeline/lib/train-test-split";
 import { saveTestSplit } from "@/shared/lib/test-split-storage";
 
 const EMPTY_VALUES = new Set(["", undefined, null]);
-const DEFAULT_GENERATION_API_URL = "http://localhost:8000/generation";
+const DEFAULT_GENERATION_API_URL = "http://localhost:8000/api/generation";
 
 function isMissingValue(value: string | undefined | null): boolean {
   return EMPTY_VALUES.has(value as "" | undefined | null);
@@ -51,7 +51,10 @@ function fillMostFrequent(values: string[]): string {
   return Object.entries(frequencies).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
 }
 
-function getFillValue(fillType: ColumnMeta["missingFill"], values: string[]): string {
+function getFillValue(
+  fillType: ColumnMeta["missingFill"],
+  values: string[],
+): string {
   switch (fillType) {
     case "mean":
       return fillMean(values);
@@ -107,7 +110,9 @@ function applyPreprocessing(
 }
 
 function getGenerationApiUrl(): string {
-  return import.meta.env.VITE_PYTHON_GENERATION_URL ?? DEFAULT_GENERATION_API_URL;
+  return (
+    import.meta.env.VITE_PYTHON_GENERATION_URL ?? DEFAULT_GENERATION_API_URL
+  );
 }
 
 async function sendTrainingSplitToServer(params: {
@@ -124,6 +129,7 @@ async function sendTrainingSplitToServer(params: {
     body: JSON.stringify({
       method: params.generationParams.method,
       recordCount: params.generationParams.recordCount,
+      cascade: params.generationParams.cascade,
       columnMeta: params.columnMeta,
       headers: params.headers,
       trainData: params.trainData,
