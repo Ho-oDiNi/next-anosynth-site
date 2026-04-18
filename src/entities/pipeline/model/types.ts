@@ -29,7 +29,6 @@ export interface GenerationParams {
   method: string;
   recordCount: number;
   testSplit: number;
-  cascade: number;
 }
 
 export interface EvaluationParams {
