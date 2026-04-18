@@ -1,14 +1,19 @@
-# Обязательно создать отдельный .venv для избежания конфликта библиотек
+# API Gateway (FastAPI)
 
-cd ./services/api-gateway
+## Назначение
+Gateway принимает данные генерации напрямую от клиента и проксирует их в `synthcity-engine`.
+
+- Эндпоинт клиента: `POST /api/generation`
+- Healthcheck: `GET /health`
+
+## Запуск
+```bash
+cd services/api-gateway
 python -m venv .venv
-
-# Windows PowerShell
-
-.venv\Scripts\Activate.ps1
-
-# Linux / macOS
-
 source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
-pip install -r .\requirements.txt
+## Переменные окружения
+- `SYNTHCITY_ENGINE_URL` — URL генератора (по умолчанию: `http://localhost:8001/generate`).
