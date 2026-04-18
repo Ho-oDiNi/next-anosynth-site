@@ -402,26 +402,6 @@ export const ControlPanel = ({
                     step={1}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Каскад
-                  </label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={Math.max(1, data.length)}
-                    value={generationParams.cascade}
-                    onChange={(event) => {
-                      const cascadeLimit = Math.max(1, data.length);
-                      const cascadeValue = Math.min(
-                        Math.max(1, parseInt(event.target.value, 10) || 1),
-                        cascadeLimit,
-                      );
-
-                      updateGenerationParam("cascade", cascadeValue);
-                    }}
-                  />
-                </div>
               </>
             )}
           </TabsContent>

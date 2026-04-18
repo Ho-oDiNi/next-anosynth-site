@@ -5,7 +5,6 @@ const INITIAL_GENERATION_PARAMS: GenerationParams = {
   method: "",
   recordCount: 0,
   testSplit: 30,
-  cascade: 1,
 };
 
 export function useGenerationSettings() {

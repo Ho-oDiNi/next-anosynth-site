@@ -129,7 +129,6 @@ async function sendTrainingSplitToServer(params: {
     body: JSON.stringify({
       method: params.generationParams.method,
       recordCount: params.generationParams.recordCount,
-      cascade: params.generationParams.cascade,
       columnMeta: params.columnMeta,
       headers: params.headers,
       trainData: params.trainData,
