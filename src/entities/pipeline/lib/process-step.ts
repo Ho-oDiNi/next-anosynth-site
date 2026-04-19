@@ -7,7 +7,7 @@ import { splitDataset } from "@/entities/pipeline/lib/train-test-split";
 import { saveTestSplit } from "@/shared/lib/test-split-storage";
 
 const EMPTY_VALUES = new Set(["", undefined, null]);
-const DEFAULT_GENERATION_API_URL = "http://localhost:8000/api/generation";
+const DEFAULT_GENERATION_API_URL = "/api/generate";
 
 function isMissingValue(value: string | undefined | null): boolean {
   return EMPTY_VALUES.has(value as "" | undefined | null);
@@ -135,8 +135,16 @@ async function sendTrainingSplitToServer(params: {
     }),
   });
 
-  if (!response.ok) {
-    throw new Error("Сервер генерации вернул ошибку");
+  let responsePayload: { ok?: boolean; error?: string } | null = null;
+  try {
+    responsePayload = (await response.json()) as { ok?: boolean; error?: string };
+  } catch {
+    responsePayload = null;
+  }
+
+  if (!response.ok || responsePayload?.ok === false) {
+    const backendError = responsePayload?.error ?? "Сервер генерации вернул ошибку";
+    throw new Error(backendError);
   }
 }
 
