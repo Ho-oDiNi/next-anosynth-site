@@ -9,5 +9,9 @@ tsai
 wheel>=0.40
 
 opacus<1.5.4
+pydantic<2.0
+
+fastapi
 
 synthcity
+IPython

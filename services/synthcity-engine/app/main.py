@@ -1,92 +1,48 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+import os
+from typing import Any
 
-import pandas as pd
+import httpx
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field, field_validator
-from synthcity.plugins import Plugins
-from synthcity.plugins.core.dataloader import GenericDataLoader
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, validator
 
 
 class ColumnMetaSchema(BaseModel):
-    """Метаданные колонки, присланные клиентом."""
-
     featureType: str = ""
-    valueType: Literal["quantitative", "categorical", "ordinal", "datetime", ""] = ""
+    valueType: str = ""
     missingFill: str = ""
-    role: Literal["feature", "target"] = "feature"
+    role: str = "feature"
 
 
 class GenerationRequest(BaseModel):
-    """Контракт генерации: весь датасет приходит от клиента."""
-
     method: str = Field(..., min_length=1)
     recordCount: int = Field(..., gt=0)
-    headers: list[str] = Field(..., min_length=1)
+    headers: list[str] = Field(...)
     trainData: list[list[str]] = Field(default_factory=list)
     columnMeta: dict[int, ColumnMetaSchema] = Field(default_factory=dict)
 
-    @field_validator("trainData")
-    @classmethod
+    @validator("trainData")
     def validate_train_data(cls, rows: list[list[str]]) -> list[list[str]]:
         if not rows:
             raise ValueError("trainData не должен быть пустым")
         return rows
 
 
-class GenerationResponse(BaseModel):
-    method: str
-    generatedRows: int
-    headers: list[str]
-    rows: list[list[Any]]
+app = FastAPI(title="api-gateway", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-def _build_dataframe(request: GenerationRequest) -> pd.DataFrame:
-    """Собирает DataFrame из данных клиента без чтения файлов."""
-
-    expected_column_count = len(request.headers)
-    for row_index, row in enumerate(request.trainData):
-        if len(row) != expected_column_count:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Строка trainData[{row_index}] содержит {len(row)} столбцов, "
-                    f"ожидалось {expected_column_count}."
-                ),
-            )
-
-    dataframe = pd.DataFrame(request.trainData, columns=request.headers)
-
-    # Простая типизация на базе метаданных клиента.
-    for column_index, meta in request.columnMeta.items():
-        if column_index < 0 or column_index >= expected_column_count:
-            continue
-
-        column_name = request.headers[column_index]
-        if meta.valueType == "quantitative":
-            dataframe[column_name] = pd.to_numeric(dataframe[column_name], errors="coerce")
-        elif meta.valueType == "datetime":
-            dataframe[column_name] = pd.to_datetime(dataframe[column_name], errors="coerce")
-
-    return dataframe
-
-
-def _detect_target_column(request: GenerationRequest) -> str | None:
-    """Определяет целевую колонку по role=target в данных клиента."""
-
-    for column_index, meta in request.columnMeta.items():
-        if meta.role == "target" and 0 <= column_index < len(request.headers):
-            return request.headers[column_index]
-    return None
-
-
-def _to_rows(dataframe: pd.DataFrame) -> list[list[Any]]:
-    sanitized = dataframe.where(pd.notnull(dataframe), None)
-    return sanitized.values.tolist()
-
-
-app = FastAPI(title="synthcity-engine", version="1.0.0")
+def get_engine_url() -> str:
+    return os.getenv("SYNTHCITY_ENGINE_URL", "http://localhost:8001/generate")
 
 
 @app.get("/health")
@@ -94,29 +50,24 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/generate", response_model=GenerationResponse)
-def generate(request: GenerationRequest) -> GenerationResponse:
+@app.post("/api/generation")
+async def generation(payload: GenerationRequest) -> Any:
     try:
-        input_dataframe = _build_dataframe(request)
-        target_column = _detect_target_column(request)
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            engine_response = await client.post(
+                get_engine_url(),
+                json=payload.dict(),
+            )
+    except httpx.RequestError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Не удалось подключиться к сервису генерации: {error}",
+        ) from error
 
-        loader = (
-            GenericDataLoader(input_dataframe, target_column=target_column)
-            if target_column
-            else GenericDataLoader(input_dataframe)
+    if engine_response.status_code >= 400:
+        raise HTTPException(
+            status_code=engine_response.status_code,
+            detail=engine_response.text,
         )
 
-        plugin = Plugins().get(request.method)
-        plugin.fit(loader)
-        generated_dataframe = plugin.generate(count=request.recordCount).dataframe()
-
-        return GenerationResponse(
-            method=request.method,
-            generatedRows=len(generated_dataframe),
-            headers=[str(column) for column in generated_dataframe.columns.tolist()],
-            rows=_to_rows(generated_dataframe),
-        )
-    except HTTPException:
-        raise
-    except Exception as error:
-        raise HTTPException(status_code=500, detail=f"Ошибка генерации: {error}") from error
+    return engine_response.json()
