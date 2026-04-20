@@ -120,7 +120,7 @@ async function sendTrainingSplitToServer(params: {
   columnMeta: Record<number, ColumnMeta>;
   generationParams: GenerationParams;
   trainData: string[][];
-}): Promise<void> {
+}): Promise<{ headers: string[]; data: string[][] }> {
   const response = await fetch(getGenerationApiUrl(), {
     method: "POST",
     headers: {
@@ -135,7 +135,14 @@ async function sendTrainingSplitToServer(params: {
     }),
   });
 
-  let responsePayload: { ok?: boolean; error?: string } | null;
+  let responsePayload:
+    | {
+        ok?: boolean;
+        error?: string;
+        headers?: unknown;
+        rows?: unknown;
+      }
+    | null;
   try {
     responsePayload = (await response.json()) as {
       ok?: boolean;
@@ -150,6 +157,29 @@ async function sendTrainingSplitToServer(params: {
       responsePayload?.error ?? "Сервер генерации вернул ошибку";
     throw new Error(backendError);
   }
+
+  const responseHeaders = Array.isArray(responsePayload?.headers)
+    ? responsePayload.headers
+    : params.headers;
+  const responseRows = Array.isArray(responsePayload?.rows)
+    ? responsePayload.rows
+    : params.trainData;
+
+  const normalizedHeaders = responseHeaders.map((header) => String(header ?? ""));
+  const normalizedData = responseRows.map((row) => {
+    if (!Array.isArray(row)) {
+      return normalizedHeaders.map(() => "");
+    }
+
+    return normalizedHeaders.map((_, columnIndex) =>
+      String(row[columnIndex] ?? ""),
+    );
+  });
+
+  return {
+    headers: normalizedHeaders,
+    data: normalizedData,
+  };
 }
 
 async function runGenerationStep(
@@ -157,7 +187,7 @@ async function runGenerationStep(
   data: string[][],
   columnMeta: Record<number, ColumnMeta>,
   generationParams: GenerationParams,
-): Promise<void> {
+): Promise<{ headers: string[]; data: string[][] }> {
   const { trainData, testData, stratified } = splitDataset(
     data,
     columnMeta,
@@ -171,7 +201,7 @@ async function runGenerationStep(
     stratified,
   });
 
-  await sendTrainingSplitToServer({
+  return sendTrainingSplitToServer({
     headers,
     columnMeta,
     generationParams,
@@ -196,7 +226,7 @@ export async function processStepStub(
   }
 
   if (step === "generation") {
-    await runGenerationStep(headers, data, columnMeta, generationParams);
+    return runGenerationStep(headers, data, columnMeta, generationParams);
   }
 
   return {
