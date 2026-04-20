@@ -167,11 +167,9 @@ function pickEnabledMetrics(evaluationParams: EvaluationParams): {
   if (evaluationParams.dcsm) sdmetricsMetrics.push("dcsm");
   if (evaluationParams.prdc) synthcityMetrics.push("prdc");
 
-  if (evaluationParams.cvr) synthcityMetrics.push("common_rows_proportion");
-  if (evaluationParams.cvc) synthcityMetrics.push("close_values_probability");
-  if (evaluationParams.scvc) {
-    synthcityMetrics.push("nearest_syn_neighbor_distance");
-  }
+  if (evaluationParams.cvr) synthcityMetrics.push("cvr");
+  if (evaluationParams.cvc) synthcityMetrics.push("cvc");
+  if (evaluationParams.scvc) synthcityMetrics.push("scvc");
 
   if (evaluationParams.dcr) sdmetricsMetrics.push("dcr");
   if (evaluationParams.identifiability) {
