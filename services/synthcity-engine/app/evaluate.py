@@ -123,13 +123,20 @@ ATTACK_ALLOWED = {
     "data_leakage_linear",
 }
 
-SANITY_ALIASES: dict[str, str] = {}
+SANITY_ALIASES: dict[str, str] = {
+    "cvr": "cvr",
+    "cvc": "cvc",
+    "scvc": "scvc",
+}
 SANITY_ALLOWED = {
     "data_mismatch",
     "nearest_syn_neighbor_distance",
     "common_rows_proportion",
     "close_values_probability",
     "distant_values_probability",
+    "cvr",
+    "cvc",
+    "scvc",
 }
 
 SUBMETRICS: dict[str, dict[str, str]] = {
@@ -548,6 +555,96 @@ def reduce_metric_output(raw: Any) -> float:
         raise ValueError(f"Не удалось извлечь числовой score из raw output: {type(raw).__name__}")
 
     return float(np.mean(values))
+
+
+def _is_missing(value: Any) -> bool:
+    if value is None:
+        return True
+    try:
+        return bool(pd.isna(value))
+    except Exception:
+        return False
+
+
+def _build_constraint_detectors(real_df: pd.DataFrame) -> list[tuple[str, Any]]:
+    detectors: list[tuple[str, Any]] = []
+
+    for column_name in real_df.columns:
+        real_series = real_df[column_name]
+        non_null_real = real_series.dropna()
+
+        if non_null_real.empty:
+            continue
+
+        numeric_real = pd.to_numeric(non_null_real, errors="coerce")
+        numeric_non_null = numeric_real.dropna()
+        numeric_ratio = len(numeric_non_null) / len(non_null_real)
+        is_numeric_constraint = numeric_ratio >= 0.9
+
+        if is_numeric_constraint:
+            lower_bound = float(numeric_non_null.min())
+            upper_bound = float(numeric_non_null.max())
+
+            def numeric_detector(
+                synth_series: pd.Series,
+                min_value: float = lower_bound,
+                max_value: float = upper_bound,
+            ) -> pd.Series:
+                numeric_values = pd.to_numeric(synth_series, errors="coerce")
+                out_of_range = (numeric_values < min_value) | (numeric_values > max_value)
+                missing_values = synth_series.apply(_is_missing)
+                return (out_of_range.fillna(True) | missing_values).astype(bool)
+
+            detectors.append((column_name, numeric_detector))
+            continue
+
+        allowed_values = set(non_null_real.astype(str).tolist())
+
+        def categorical_detector(
+            synth_series: pd.Series,
+            allowed: set[str] = allowed_values,
+        ) -> pd.Series:
+            missing_values = synth_series.apply(_is_missing)
+            series_as_str = synth_series.astype(str)
+            not_in_allowed = ~series_as_str.isin(allowed)
+            return (not_in_allowed | missing_values).astype(bool)
+
+        detectors.append((column_name, categorical_detector))
+
+    return detectors
+
+
+def evaluate_constraint_violation_metrics(real_df: pd.DataFrame, synth_df: pd.DataFrame) -> dict[str, float]:
+    detectors = _build_constraint_detectors(real_df)
+    synth_row_count = len(synth_df)
+
+    if synth_row_count == 0:
+        raise ValueError("Синтетический датасет пустой: невозможно вычислить CVR/CVC/sCVC")
+    if len(detectors) == 0:
+        raise ValueError("Не удалось извлечь ограничения из исходных данных")
+
+    violation_matrix: list[pd.Series] = []
+    for column_name, detector in detectors:
+        if column_name not in synth_df.columns:
+            raise ValueError(f"Колонка ограничения отсутствует в синтетическом наборе: {column_name}")
+        violation_matrix.append(detector(synth_df[column_name]))
+
+    violations_by_constraint = pd.DataFrame(violation_matrix).transpose().fillna(True).astype(bool)
+
+    violated_by_row = violations_by_constraint.any(axis=1)
+    violated_by_constraint = violations_by_constraint.any(axis=0)
+    violation_rate_by_constraint = violations_by_constraint.mean(axis=0)
+
+    cvr_score = float(violated_by_row.mean())
+    cvc_score = float(violated_by_constraint.mean())
+    scvc_score = float(violation_rate_by_constraint.mean())
+
+    return {
+        "cvr": max(0.0, min(1.0, cvr_score)),
+        "cvc": max(0.0, min(1.0, cvc_score)),
+        "scvc": max(0.0, min(1.0, scvc_score)),
+        "constraints_count": float(len(detectors)),
+    }
 
 
 def _flatten(obj: Any, prefix: str = "") -> dict[str, Any]:
@@ -1266,6 +1363,23 @@ def evaluate_single_metric(
         }]
 
     if group == "sanity":
+        if metric_name in {"cvr", "cvc", "scvc"}:
+            real_df, synth_df = prepare_tabular_pair(real_df_raw, synth_df_raw, column_meta, fillna=False)
+            constraint_scores = evaluate_constraint_violation_metrics(real_df=real_df, synth_df=synth_df)
+            return [{
+                "group": group,
+                "metric": metric_name,
+                "metricRequested": metric_requested,
+                "metricCanonical": metric_name,
+                "score": float(constraint_scores[metric_name]),
+                "error": "",
+                "details": {
+                    "nReal": len(real_df),
+                    "nSynth": len(synth_df),
+                    "constraintsCount": int(constraint_scores["constraints_count"]),
+                },
+            }]
+
         metric_cls = resolve_metric_class(SANITY_MODULE, metric_name)
         evaluator = instantiate_evaluator(metric_cls, workspace=workspace, seed=seed)
 
