@@ -135,15 +135,19 @@ async function sendTrainingSplitToServer(params: {
     }),
   });
 
-  let responsePayload: { ok?: boolean; error?: string } | null = null;
+  let responsePayload: { ok?: boolean; error?: string } | null;
   try {
-    responsePayload = (await response.json()) as { ok?: boolean; error?: string };
+    responsePayload = (await response.json()) as {
+      ok?: boolean;
+      error?: string;
+    };
   } catch {
     responsePayload = null;
   }
 
   if (!response.ok || responsePayload?.ok === false) {
-    const backendError = responsePayload?.error ?? "Сервер генерации вернул ошибку";
+    const backendError =
+      responsePayload?.error ?? "Сервер генерации вернул ошибку";
     throw new Error(backendError);
   }
 }

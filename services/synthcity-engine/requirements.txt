@@ -1,17 +1,14 @@
-numpy>=1.20
+numpy<2
 pandas
 scikit-learn
 scipy
 tqdm
 
-torch>=2.1, <2.3
-tsai
+torch<2.3
+tsai==0.3.9
 wheel>=0.40
 
 opacus<1.5.4
-pydantic<2.0
 
-fastapi
-
-synthcity
-IPython
+# synthcity: ставить отдельной командой в конце
+# synthcity

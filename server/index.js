@@ -2,15 +2,17 @@ import cors from "cors";
 import express from "express";
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, "..");
+
 const PYTHON_SCRIPT_PATH = path.resolve(
   PROJECT_ROOT,
-  "services/synthcity-engine/scripts/generate_once.py",
+  "services/synthcity-engine/app/generate.py",
 );
 const DEFAULT_PORT = 8001;
 
@@ -24,17 +26,19 @@ function resolvePythonExecutable() {
     return process.env.PYTHON_BIN;
   }
 
-  const venvPython = path.resolve(PROJECT_ROOT, ".venv/bin/python");
   return process.platform === "win32"
-    ? path.resolve(PROJECT_ROOT, ".venv/Scripts/python.exe")
-    : venvPython;
+    ? path.resolve(
+        PROJECT_ROOT,
+        "services/synthcity-engine/.venv/Scripts/python.exe",
+      )
+    : path.resolve(PROJECT_ROOT, "services/synthcity-engine/.venv/bin/python");
 }
 
-async function ensureScriptExists() {
+async function ensurePathExists(targetPath, label) {
   try {
-    await access(PYTHON_SCRIPT_PATH);
+    await access(targetPath);
   } catch {
-    throw new Error(`Python-скрипт не найден: ${PYTHON_SCRIPT_PATH}`);
+    throw new Error(`${label} не найден: ${targetPath}`);
   }
 }
 
@@ -44,27 +48,49 @@ app.get("/health", (_req, res) => {
 
 app.post("/api/generate", async (req, res) => {
   try {
-    await ensureScriptExists();
-
     const pythonExecutable = resolvePythonExecutable();
-    const pythonProcess = spawn(pythonExecutable, [PYTHON_SCRIPT_PATH], {
-      cwd: PROJECT_ROOT,
-      env: process.env,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+
+    await ensurePathExists(pythonExecutable, "Python executable");
+    await ensurePathExists(PYTHON_SCRIPT_PATH, "Python-скрипт");
+
+    console.log("PYTHON_BIN =", pythonExecutable);
+    console.log("PYTHON exists =", fs.existsSync(pythonExecutable));
+    console.log("PYTHON_SCRIPT =", PYTHON_SCRIPT_PATH);
+    console.log("SCRIPT exists =", fs.existsSync(PYTHON_SCRIPT_PATH));
+
+    const pythonProcess = spawn(
+      pythonExecutable,
+      ["-X", "utf8", "-u", PYTHON_SCRIPT_PATH],
+      {
+        cwd: path.resolve(PROJECT_ROOT, "services/synthcity-engine"),
+        env: {
+          ...process.env,
+          PYTHONUTF8: "1",
+          PYTHONIOENCODING: "utf-8",
+        },
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
 
     let stdoutBuffer = "";
     let stderrBuffer = "";
 
     pythonProcess.stdout.on("data", (chunk) => {
-      stdoutBuffer += chunk.toString();
+      const text = chunk.toString();
+      stdoutBuffer += text;
     });
 
     pythonProcess.stderr.on("data", (chunk) => {
-      stderrBuffer += chunk.toString();
+      const text = chunk.toString();
+      stderrBuffer += text;
+      process.stderr.write(`[PYTHON] ${text}`);
     });
 
     pythonProcess.on("error", (error) => {
+      if (res.headersSent) {
+        return;
+      }
+
       res.status(500).json({
         ok: false,
         error: `Не удалось запустить Python-процесс: ${error.message}`,
@@ -78,6 +104,7 @@ app.post("/api/generate", async (req, res) => {
 
       if (exitCode !== 0) {
         let parsedError = { ok: false, error: "Ошибка Python worker" };
+
         if (stderrBuffer.trim()) {
           try {
             parsedError = JSON.parse(stderrBuffer);
@@ -96,7 +123,10 @@ app.post("/api/generate", async (req, res) => {
       } catch (error) {
         res.status(500).json({
           ok: false,
-          error: `Некорректный JSON от Python worker: ${error.message}`,
+          error:
+            error instanceof Error
+              ? `Некорректный JSON от Python worker: ${error.message}`
+              : "Некорректный JSON от Python worker",
           raw: stdoutBuffer.trim(),
         });
       }

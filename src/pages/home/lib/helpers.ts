@@ -6,7 +6,7 @@ import {
 import { detectValueType } from "@/shared/lib/detectValueType";
 
 export const MAX_COLUMNS = 25;
-export const MAX_ROWS = 100;
+export const MAX_ROWS = 1000;
 export const DEFAULT_ACTIVE_STEP: StepName = "preprocessing";
 
 type DownloadTextFileParams = {
