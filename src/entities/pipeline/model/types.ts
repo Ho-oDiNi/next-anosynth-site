@@ -23,6 +23,10 @@ export interface ColumnMeta {
   valueType: ValueType;
   missingFill: MissingFill;
   role: ColumnRole;
+  postprocessMinValue: string;
+  postprocessMaxValue: string;
+  postprocessIntegerOnly: boolean;
+  postprocessAllowedValues: string;
 }
 
 export interface GenerationParams {

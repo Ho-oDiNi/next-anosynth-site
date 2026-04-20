@@ -135,6 +135,97 @@ function applyPreprocessing(
   return nextData;
 }
 
+function parsePostprocessingAllowedValues(rawValue: string): string[] {
+  return rawValue
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+function applyPostprocessing(
+  data: string[][],
+  columnMeta: Record<number, ColumnMeta>,
+): string[][] {
+  const nextData = data.map((row) => [...row]);
+
+  for (const [columnIndexAsText, meta] of Object.entries(columnMeta)) {
+    const columnIndex = Number(columnIndexAsText);
+
+    if (meta.valueType === "quantitative") {
+      const minValue =
+        meta.postprocessMinValue.trim() === ""
+          ? null
+          : Number(meta.postprocessMinValue);
+      const maxValue =
+        meta.postprocessMaxValue.trim() === ""
+          ? null
+          : Number(meta.postprocessMaxValue);
+      const hasValidMin = minValue !== null && !Number.isNaN(minValue);
+      const hasValidMax = maxValue !== null && !Number.isNaN(maxValue);
+
+      for (const row of nextData) {
+        const rawCellValue = row[columnIndex];
+
+        if (isMissingValue(rawCellValue)) {
+          continue;
+        }
+
+        const numericValue = Number(rawCellValue);
+        if (Number.isNaN(numericValue)) {
+          continue;
+        }
+
+        let normalizedValue = numericValue;
+
+        if (hasValidMin && minValue !== null) {
+          normalizedValue = Math.max(normalizedValue, minValue);
+        }
+
+        if (hasValidMax && maxValue !== null) {
+          normalizedValue = Math.min(normalizedValue, maxValue);
+        }
+
+        if (meta.postprocessIntegerOnly) {
+          normalizedValue = Math.round(normalizedValue);
+        }
+
+        row[columnIndex] = String(normalizedValue);
+      }
+
+      continue;
+    }
+
+    if (meta.valueType !== "categorical") {
+      continue;
+    }
+
+    const allowedValues = parsePostprocessingAllowedValues(
+      meta.postprocessAllowedValues,
+    );
+
+    if (allowedValues.length === 0) {
+      continue;
+    }
+
+    const allowedValueSet = new Set(allowedValues);
+    const fallbackValue = allowedValues[0];
+
+    for (const row of nextData) {
+      const rawCellValue = row[columnIndex];
+
+      if (isMissingValue(rawCellValue)) {
+        continue;
+      }
+
+      if (!allowedValueSet.has(rawCellValue)) {
+        row[columnIndex] = fallbackValue;
+      }
+    }
+  }
+
+  return nextData;
+}
+
 function getGenerationApiUrl(): string {
   return (
     import.meta.env.VITE_PYTHON_GENERATION_URL ?? DEFAULT_GENERATION_API_URL
@@ -417,6 +508,13 @@ export async function processStepStub(
 
   if (step === "generation") {
     return runGenerationStep(headers, data, columnMeta, generationParams);
+  }
+
+  if (step === "postprocessing") {
+    return {
+      headers: [...headers],
+      data: applyPostprocessing(data, columnMeta),
+    };
   }
 
   if (step === "evaluation") {

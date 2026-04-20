@@ -107,6 +107,7 @@ export const ControlPanel = ({
     selectedCol !== null ? columnMeta[selectedCol] : undefined;
 
   const isQuantitative = currentMeta?.valueType === "quantitative";
+  const isCategorical = currentMeta?.valueType === "categorical";
   const isResults = activeStep === "results";
 
   const availableMissingFills = useMemo(
@@ -426,10 +427,103 @@ export const ControlPanel = ({
                 <Lock className="h-4 w-4" />
                 Завершите генерацию, чтобы разблокировать.
               </div>
-            ) : (
+            ) : !hasData ? (
               <p className="text-sm text-muted-foreground">
-                Инструменты постобработки данных.
+                Загрузите CSV файл для начала работы.
               </p>
+            ) : selectedCol === null ? (
+              <p className="text-sm text-muted-foreground">
+                Выберите столбец (нажмите на заголовок), чтобы настроить его
+                ограничения.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-md border border-border bg-secondary p-3">
+                  <p className="mb-1 text-xs text-muted-foreground">
+                    Выбран столбец
+                  </p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {headers[selectedCol]}
+                  </p>
+                </div>
+
+                {isQuantitative && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Минимальное значение
+                      </label>
+                      <Input
+                        type="number"
+                        value={currentMeta?.postprocessMinValue ?? ""}
+                        onChange={(event) =>
+                          onColumnMetaChange(selectedCol, {
+                            postprocessMinValue: event.target.value,
+                          })
+                        }
+                        placeholder="Не задано"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Максимальное значение
+                      </label>
+                      <Input
+                        type="number"
+                        value={currentMeta?.postprocessMaxValue ?? ""}
+                        onChange={(event) =>
+                          onColumnMetaChange(selectedCol, {
+                            postprocessMaxValue: event.target.value,
+                          })
+                        }
+                        placeholder="Не задано"
+                      />
+                    </div>
+
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(currentMeta?.postprocessIntegerOnly)}
+                        onChange={(event) =>
+                          onColumnMetaChange(selectedCol, {
+                            postprocessIntegerOnly: event.target.checked,
+                          })
+                        }
+                      />
+                      Только целочисленные значения
+                    </label>
+                  </>
+                )}
+
+                {isCategorical && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Возможные значения
+                    </label>
+                    <Input
+                      type="text"
+                      value={currentMeta?.postprocessAllowedValues ?? ""}
+                      onChange={(event) =>
+                        onColumnMetaChange(selectedCol, {
+                          postprocessAllowedValues: event.target.value,
+                        })
+                      }
+                      placeholder="Например: red, green, blue"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Укажите значения через запятую.
+                    </p>
+                  </div>
+                )}
+
+                {!isQuantitative && !isCategorical && (
+                  <p className="text-sm text-muted-foreground">
+                    Ограничения доступны для количественных и качественных
+                    признаков.
+                  </p>
+                )}
+              </div>
             )}
           </TabsContent>
 
