@@ -1,11 +1,14 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { processStepStub } from "@/entities/pipeline/lib/process-step";
+import {
+  processStepStub,
+  type EvaluationReport,
+} from "@/entities/pipeline/lib/process-step";
 import {
   STEPS,
-  defaultEvaluation,
   getStepLabel,
   type ColumnMeta,
+  type EvaluationParams,
   type GenerationParams,
   type StepName,
 } from "@/entities/pipeline/model/types";
@@ -20,8 +23,10 @@ interface UsePipelineStepsParams {
   data: string[][];
   columnMeta: Record<number, ColumnMeta>;
   generationParams: GenerationParams;
+  evaluationParams: EvaluationParams;
   setHeaders: React.Dispatch<React.SetStateAction<string[]>>;
   setData: React.Dispatch<React.SetStateAction<string[][]>>;
+  setEvaluationReport: React.Dispatch<React.SetStateAction<EvaluationReport | null>>;
 }
 
 export function usePipelineSteps({
@@ -29,8 +34,10 @@ export function usePipelineSteps({
   data,
   columnMeta,
   generationParams,
+  evaluationParams,
   setHeaders,
   setData,
+  setEvaluationReport,
 }: UsePipelineStepsParams) {
   const [activeStep, setActiveStep] = useState<StepName>(DEFAULT_ACTIVE_STEP);
   const [completedSteps, setCompletedSteps] = useState<Set<StepName>>(
@@ -38,10 +45,11 @@ export function usePipelineSteps({
   );
   const [processing, setProcessing] = useState(false);
 
-  const resetSteps = useCallback((nextRowCount?: number) => {
+  const resetSteps = useCallback(() => {
     setCompletedSteps(new Set());
     setActiveStep(DEFAULT_ACTIVE_STEP);
-  }, []);
+    setEvaluationReport(null);
+  }, [setEvaluationReport]);
 
   const handleStepNext = useCallback(async () => {
     if (processing) {
@@ -57,10 +65,16 @@ export function usePipelineSteps({
         data,
         columnMeta,
         generationParams,
+        evaluationParams,
       );
 
       setHeaders(result.headers);
       setData(result.data);
+
+      if (result.evaluationReport) {
+        setEvaluationReport(result.evaluationReport);
+      }
+
       setCompletedSteps((prev) => getNextCompletedSteps(prev, activeStep));
 
       const currentStepIndex = STEPS.indexOf(activeStep);
@@ -81,9 +95,11 @@ export function usePipelineSteps({
     data,
     columnMeta,
     generationParams,
+    evaluationParams,
     processing,
     setHeaders,
     setData,
+    setEvaluationReport,
   ]);
 
   const isStepAccessible = useCallback(

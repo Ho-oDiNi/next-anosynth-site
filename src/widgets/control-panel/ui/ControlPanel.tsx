@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import { Download, Loader2, Lock, Upload } from "lucide-react";
+import { Download, FileImage, FileSpreadsheet, Loader2, Lock, Upload } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -23,6 +23,7 @@ import type {
   StepName,
   ValueType,
 } from "@/entities/pipeline/model/types";
+import type { EvaluationReport } from "@/entities/pipeline/lib/process-step";
 
 import {
   DATA_LEAKAGE_OPTIONS,
@@ -63,6 +64,9 @@ interface ControlPanelProps {
   onGenerationParamsChange: (params: GenerationParams) => void;
   evaluationParams: EvaluationParams;
   onEvaluationParamsChange: (params: EvaluationParams) => void;
+  evaluationReport: EvaluationReport | null;
+  onEvaluationCsvDownload: () => void;
+  onEvaluationPngDownload: () => void;
 }
 
 export const ControlPanel = ({
@@ -84,6 +88,9 @@ export const ControlPanel = ({
   onGenerationParamsChange,
   evaluationParams,
   onEvaluationParamsChange,
+  evaluationReport,
+  onEvaluationCsvDownload,
+  onEvaluationPngDownload,
 }: ControlPanelProps) => {
   const isCurrentStepValid =
     activeStep === "generation" ? generationParams.method.trim() !== "" : true;
@@ -563,9 +570,65 @@ export const ControlPanel = ({
                 Завершите оценивание, чтобы разблокировать.
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Результаты обработки данных.
-              </p>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <Button
+                    onClick={onEvaluationPngDownload}
+                    disabled={!evaluationReport || evaluationReport.rows.length === 0}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <FileImage className="h-4 w-4" />
+                    Скачать оценку PNG
+                  </Button>
+                  <Button
+                    onClick={onEvaluationCsvDownload}
+                    disabled={!evaluationReport || evaluationReport.rows.length === 0}
+                    className="gap-2"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Скачать оценку CSV
+                  </Button>
+                </div>
+
+                {!evaluationReport || evaluationReport.rows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Результаты оценивания появятся после выполнения шага «Оценивание».
+                  </p>
+                ) : (
+                  <div className="space-y-2 rounded-md border border-border p-3">
+                    <p className="text-xs text-muted-foreground">
+                      ID оценивания: {evaluationReport.evaluationId}
+                    </p>
+                    <div className="max-h-64 overflow-auto rounded-md border border-border">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-secondary">
+                          <tr>
+                            <th className="p-2 text-left">Группа</th>
+                            <th className="p-2 text-left">Метрика</th>
+                            <th className="p-2 text-left">Скор</th>
+                            <th className="p-2 text-left">Ошибка</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {evaluationReport.rows.map((row, rowIndex) => (
+                            <tr key={`${row.metricRequested}-${rowIndex}`} className="border-t border-border">
+                              <td className="p-2">{row.group}</td>
+                              <td className="p-2">{row.metricRequested}</td>
+                              <td className="p-2">
+                                {row.score === null ? "—" : row.score.toFixed(6)}
+                              </td>
+                              <td className="p-2 text-destructive">
+                                {row.error || "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </TabsContent>
         </div>

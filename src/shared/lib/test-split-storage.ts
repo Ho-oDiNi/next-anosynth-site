@@ -10,6 +10,10 @@ interface SaveTestSplitPayload {
   stratified: boolean;
 }
 
+export interface SavedTestSplit extends SaveTestSplitPayload {
+  updatedAt: string;
+}
+
 function openTestSplitDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
@@ -41,10 +45,10 @@ function openTestSplitDatabase(): Promise<IDBDatabase> {
   });
 }
 
-function runStoreTransaction<T>(
+function runStoreTransaction(
   database: IDBDatabase,
   mode: IDBTransactionMode,
-  action: (store: IDBObjectStore) => IDBRequest<T> | void,
+  action: (store: IDBObjectStore) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, mode);
@@ -64,6 +68,25 @@ function runStoreTransaction<T>(
   });
 }
 
+function readFromStore<T>(
+  database: IDBDatabase,
+  key: IDBValidKey,
+): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(key);
+
+    request.onsuccess = () => {
+      resolve(request.result as T | undefined);
+    };
+
+    request.onerror = () => {
+      reject(request.error ?? new Error("Не удалось прочитать данные из IndexedDB"));
+    };
+  });
+}
+
 export async function saveTestSplit(payload: SaveTestSplitPayload): Promise<void> {
   const database = await openTestSplitDatabase();
 
@@ -77,6 +100,17 @@ export async function saveTestSplit(payload: SaveTestSplitPayload): Promise<void
         TEST_SPLIT_KEY,
       );
     });
+  } finally {
+    database.close();
+  }
+}
+
+export async function getSavedTestSplit(): Promise<SavedTestSplit | null> {
+  const database = await openTestSplitDatabase();
+
+  try {
+    const result = await readFromStore<SavedTestSplit>(database, TEST_SPLIT_KEY);
+    return result ?? null;
   } finally {
     database.close();
   }
