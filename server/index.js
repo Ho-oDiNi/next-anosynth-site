@@ -123,6 +123,90 @@ function normalizeResultsArray(results) {
   return Array.isArray(results) ? results : [];
 }
 
+function normalizeMetricKey(metricName) {
+  return String(metricName ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("-", "_")
+    .replaceAll(" ", "_");
+}
+
+const METRIC_LABELS = {
+  linear_model: "TSTR Linear",
+  xgb: "TSTR XGBoost",
+  mlp: "TSTR MLP",
+  wasserstein_dist: "Расстояние Вассерштейна",
+  ks_test: "Критерий Колмогорова–Смирнова",
+  jensenshannon_dist: "Дивергенция Дженсена–Шеннона",
+  chi_squared_test: "Критерий χ²",
+  dcr: "DCR",
+  identifiability_score: "Identifiability Score",
+  k_anonymization: "k-anonymization",
+  k_map: "k-map",
+  distinct_l_diversity: "l-diversity",
+  data_leakage_linear: "Data Leakage Linear",
+  data_leakage_xgb: "Data Leakage XGBoost",
+  data_leakage_mlp: "Data Leakage MLP",
+  domiasmia_kde: "DomiasMIA KDE",
+  domiasmia_prior: "DomiasMIA Prior",
+  domiasmia_bnaf: "DomiasMIA BNAF",
+  dpcm: "DPCM",
+  dcsm: "DCSM",
+};
+
+const GROUP_BY_METRIC = {
+  linear_model: "Полезность МО",
+  xgb: "Полезность МО",
+  mlp: "Полезность МО",
+  wasserstein_dist: "Реалистичность",
+  ks_test: "Реалистичность",
+  jensenshannon_dist: "Реалистичность",
+  chi_squared_test: "Реалистичность",
+  dpcm: "Реалистичность",
+  dcsm: "Реалистичность",
+  prdc: "Реалистичность",
+  dcr: "Атака ПИ",
+  identifiability_score: "Атака ПИ",
+  k_anonymization: "Атака ПИ",
+  k_map: "Атака ПИ",
+  distinct_l_diversity: "Атака ВА",
+  data_leakage_linear: "Атака ВА",
+  data_leakage_xgb: "Атака ВА",
+  data_leakage_mlp: "Атака ВА",
+  delta_presence: "Атака ВЧ",
+  domiasmia: "Атака ВЧ",
+  domiasmia_kde: "Атака ВЧ",
+  domiasmia_prior: "Атака ВЧ",
+  domiasmia_bnaf: "Атака ВЧ",
+};
+
+function resolvePrdcLabel(metricName) {
+  const prdcMetricKey = normalizeMetricKey(metricName);
+  if (prdcMetricKey === "precision") return "PRDC precision";
+  if (prdcMetricKey === "recall") return "PRDC recall";
+  if (prdcMetricKey === "density") return "PRDC dencity";
+  if (prdcMetricKey === "coverage") return "PRDC coverage";
+  return "PRDC";
+}
+
+function formatEvaluationRow(rawRow) {
+  const metricRequestedKey = normalizeMetricKey(rawRow?.metricRequested);
+  const metricKey = normalizeMetricKey(rawRow?.metric);
+  const baseMetricKey = metricRequestedKey || metricKey;
+
+  const metricLabel = metricRequestedKey === "prdc"
+    ? resolvePrdcLabel(metricKey)
+    : (METRIC_LABELS[baseMetricKey] ?? rawRow?.metricRequested ?? rawRow?.metric ?? "");
+
+  const groupLabel = GROUP_BY_METRIC[baseMetricKey] ?? rawRow?.group ?? "";
+
+  return {
+    ...rawRow,
+    group: groupLabel,
+    metricRequested: metricLabel,
+  };
+}
+
 function runPythonWorker({
   pythonExecutable,
   scriptPath,
@@ -293,7 +377,9 @@ app.post("/api/evaluate", async (req, res) => {
 
     const responses = await Promise.all(workerCalls);
 
-    const mergedResults = responses.flatMap((item) => normalizeResultsArray(item.results));
+    const mergedResults = responses
+      .flatMap((item) => normalizeResultsArray(item.results))
+      .map((row) => formatEvaluationRow(row));
     const evaluationId = responses
       .map((item) => item.evaluationId)
       .filter(Boolean)
