@@ -15,6 +15,7 @@ export function HomePage() {
     evaluationParams,
     generationParams,
     hasData,
+    evaluationReport,
     setSelectedCol,
     setActiveStep,
     setEvaluationParams,
@@ -22,6 +23,8 @@ export function HomePage() {
     isStepAccessible,
     handleUpload,
     handleDownload,
+    handleEvaluationCsvDownload,
+    handleEvaluationPngDownload,
     handleCellChange,
     handleHeaderChange,
     handleColumnMetaChange,
@@ -77,6 +80,9 @@ export function HomePage() {
           onGenerationParamsChange={setGenerationParams}
           evaluationParams={evaluationParams}
           onEvaluationParamsChange={setEvaluationParams}
+          evaluationReport={evaluationReport}
+          onEvaluationCsvDownload={handleEvaluationCsvDownload}
+          onEvaluationPngDownload={handleEvaluationPngDownload}
         />
       </div>
     </div>
