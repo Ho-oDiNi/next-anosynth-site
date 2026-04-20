@@ -13,10 +13,9 @@ import { useTableEditor } from "./use-table-editor";
 import { downloadTextFile } from "./helpers";
 
 function formatEvaluationResultsAsCsv(rows: EvaluationMetricResult[]): string {
-  const csvHeaders = ["group", "metric", "metricRequested", "score", "error"];
+  const csvHeaders = ["group", "metricRequested", "score", "error"];
   const csvRows = rows.map((row) => [
     row.group,
-    row.metric,
     row.metricRequested,
     row.score === null ? "" : String(row.score),
     row.error,
@@ -67,7 +66,6 @@ function drawEvaluationResultsAsPng(rows: EvaluationMetricResult[]): Blob {
     const rowY = headerY + rowHeight * (index + 1);
     const values = [
       row.group,
-      row.metric,
       row.metricRequested,
       row.score === null ? "—" : row.score.toFixed(6),
       row.error || "—",

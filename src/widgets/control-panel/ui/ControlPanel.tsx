@@ -1,5 +1,12 @@
 import { useMemo, useRef } from "react";
-import { Download, FileImage, FileSpreadsheet, Loader2, Lock, Upload } from "lucide-react";
+import {
+  Download,
+  FileImage,
+  FileSpreadsheet,
+  Loader2,
+  Lock,
+  Upload,
+} from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -563,18 +570,20 @@ export const ControlPanel = ({
             )}
           </TabsContent>
 
-          <TabsContent value="results" className="m-0 p-4">
+          <TabsContent value="results" className="m-0 p-4 h-full">
             {isStepLocked("results") ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Lock className="h-4 w-4" />
                 Завершите оценивание, чтобы разблокировать.
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 h-full">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <Button
                     onClick={onEvaluationPngDownload}
-                    disabled={!evaluationReport || evaluationReport.rows.length === 0}
+                    disabled={
+                      !evaluationReport || evaluationReport.rows.length === 0
+                    }
                     variant="outline"
                     className="gap-2"
                   >
@@ -583,24 +592,27 @@ export const ControlPanel = ({
                   </Button>
                   <Button
                     onClick={onEvaluationCsvDownload}
-                    disabled={!evaluationReport || evaluationReport.rows.length === 0}
+                    disabled={
+                      !evaluationReport || evaluationReport.rows.length === 0
+                    }
+                    variant="outline"
                     className="gap-2"
                   >
                     <FileSpreadsheet className="h-4 w-4" />
                     Скачать оценку CSV
                   </Button>
                 </div>
-
                 {!evaluationReport || evaluationReport.rows.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Результаты оценивания появятся после выполнения шага «Оценивание».
+                    Результаты оценивания появятся после выполнения шага
+                    «Оценивание».
                   </p>
                 ) : (
-                  <div className="space-y-2 rounded-md border border-border p-3">
+                  <div className="space-y-2 h-full">
                     <p className="text-xs text-muted-foreground">
                       ID оценивания: {evaluationReport.evaluationId}
                     </p>
-                    <div className="max-h-64 overflow-auto rounded-md border border-border">
+                    <div className="overflow-auto rounded-md border border-border">
                       <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-secondary">
                           <tr>
@@ -612,11 +624,16 @@ export const ControlPanel = ({
                         </thead>
                         <tbody>
                           {evaluationReport.rows.map((row, rowIndex) => (
-                            <tr key={`${row.metricRequested}-${rowIndex}`} className="border-t border-border">
+                            <tr
+                              key={`${row.metricRequested}-${rowIndex}`}
+                              className="border-t border-border"
+                            >
                               <td className="p-2">{row.group}</td>
                               <td className="p-2">{row.metricRequested}</td>
                               <td className="p-2">
-                                {row.score === null ? "—" : row.score.toFixed(6)}
+                                {row.score === null
+                                  ? "—"
+                                  : row.score.toFixed(6)}
                               </td>
                               <td className="p-2 text-destructive">
                                 {row.error || "—"}

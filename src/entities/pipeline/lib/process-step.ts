@@ -17,7 +17,6 @@ const DEFAULT_EVALUATION_API_URL = "/api/evaluate";
 
 export interface EvaluationMetricResult {
   group: string;
-  metric: string;
   metricRequested: string;
   score: number | null;
   error: string;
@@ -180,7 +179,8 @@ function pickEnabledMetrics(evaluationParams: EvaluationParams): {
   }
   if (evaluationParams.kAnonymization) synthcityMetrics.push("k_anonymization");
   if (evaluationParams.kMap) synthcityMetrics.push("k_map");
-  if (evaluationParams.lDiversity) synthcityMetrics.push("distinct_l_diversity");
+  if (evaluationParams.lDiversity)
+    synthcityMetrics.push("distinct_l_diversity");
 
   if (evaluationParams.dataLeakage.linear) {
     synthcityMetrics.push("data_leakage_linear");
@@ -247,14 +247,12 @@ async function sendTrainingSplitToServer(params: {
     }),
   });
 
-  let responsePayload:
-    | {
-        ok?: boolean;
-        error?: string;
-        headers?: unknown;
-        rows?: unknown;
-      }
-    | null;
+  let responsePayload: {
+    ok?: boolean;
+    error?: string;
+    headers?: unknown;
+    rows?: unknown;
+  } | null;
   try {
     responsePayload = (await response.json()) as {
       ok?: boolean;
@@ -277,7 +275,9 @@ async function sendTrainingSplitToServer(params: {
     ? responsePayload.rows
     : params.trainData;
 
-  const normalizedHeaders = responseHeaders.map((header) => String(header ?? ""));
+  const normalizedHeaders = responseHeaders.map((header) =>
+    String(header ?? ""),
+  );
   const normalizedData = responseRows.map((row) => {
     if (!Array.isArray(row)) {
       return normalizedHeaders.map(() => "");
@@ -325,8 +325,14 @@ async function runGenerationStep(
   };
 }
 
-function ensureTestSplitExists(savedTestSplit: SavedTestSplit | null): SavedTestSplit {
-  if (!savedTestSplit || !savedTestSplit.headers.length || !savedTestSplit.rows.length) {
+function ensureTestSplitExists(
+  savedTestSplit: SavedTestSplit | null,
+): SavedTestSplit {
+  if (
+    !savedTestSplit ||
+    !savedTestSplit.headers.length ||
+    !savedTestSplit.rows.length
+  ) {
     throw new Error(
       "Не найден тестовый сплит. Выполните шаг генерации перед оцениванием.",
     );
