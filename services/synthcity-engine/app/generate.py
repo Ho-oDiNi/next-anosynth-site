@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import traceback
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Iterator
 
 import pandas as pd
 
@@ -25,15 +27,33 @@ METHOD_MAP: dict[str, str | None] = {
 UNSUPPORTED_METHODS = {"EPIC", "SOS"}
 
 
-def resolve_method_name(method: str) -> str:
-    normalized_method = method.strip()
+@contextmanager
+def redirect_native_stdout_to_stderr() -> Iterator[None]:
+    """
+    Временно перенаправляет файловый дескриптор stdout -> stderr.
+    Это ловит не только обычные print(), но и часть вывода сторонних библиотек,
+    которые пишут напрямую в stdout во время fit/generate.
+    """
+    saved_stdout_fd: int | None = None
 
-    if normalized_method in UNSUPPORTED_METHODS:
-        raise ValueError(f'Метод "{normalized_method}" пока не поддерживается')
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
 
-    mapped_method = METHOD_MAP.get(normalized_method, normalized_method)
+        saved_stdout_fd = os.dup(sys.stdout.fileno())
+        os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
 
-    return mapped_method
+        yield
+    finally:
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:
+            pass
+
+        if saved_stdout_fd is not None:
+            os.dup2(saved_stdout_fd, sys.stdout.fileno())
+            os.close(saved_stdout_fd)
 
 
 @dataclass(slots=True)
@@ -110,6 +130,20 @@ def ensure_positive_int(value: Any, field_name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ValueError(f"{field_name} должен быть положительным целым числом")
     return value
+
+
+def resolve_method_name(method: str) -> str:
+    normalized_method = method.strip()
+
+    if normalized_method in UNSUPPORTED_METHODS:
+        raise ValueError(f'Метод "{normalized_method}" пока не поддерживается')
+
+    mapped_method = METHOD_MAP.get(normalized_method, normalized_method)
+
+    if mapped_method is None:
+        raise ValueError(f'Метод "{normalized_method}" не поддерживается')
+
+    return mapped_method
 
 
 def parse_column_meta(raw_meta: Any) -> dict[int, ColumnMetaSchema]:
@@ -210,12 +244,17 @@ def build_dataframe(request: GenerationRequest) -> pd.DataFrame:
             )
 
     dataframe = pd.DataFrame(request.trainData, columns=request.headers)
+    dataframe.columns = [str(column).strip() for column in dataframe.columns]
+
+    duplicated_columns = dataframe.columns[dataframe.columns.duplicated()].tolist()
+    if duplicated_columns:
+        raise ValueError(f"Обнаружены дублирующиеся названия колонок: {duplicated_columns}")
 
     for column_index, column_meta in request.columnMeta.items():
         if column_index < 0 or column_index >= expected_column_count:
             continue
 
-        column_name = request.headers[column_index]
+        column_name = dataframe.columns[column_index]
 
         if column_meta.valueType == "quantitative":
             dataframe[column_name] = pd.to_numeric(dataframe[column_name], errors="coerce")
@@ -225,10 +264,10 @@ def build_dataframe(request: GenerationRequest) -> pd.DataFrame:
     return dataframe
 
 
-def detect_target_column(request: GenerationRequest) -> str | None:
+def detect_target_column(request: GenerationRequest, dataframe: pd.DataFrame) -> str | None:
     for column_index, column_meta in request.columnMeta.items():
-        if column_meta.role == "target" and 0 <= column_index < len(request.headers):
-            return request.headers[column_index]
+        if column_meta.role == "target" and 0 <= column_index < len(dataframe.columns):
+            return str(dataframe.columns[column_index])
     return None
 
 
@@ -239,6 +278,16 @@ def dataframe_to_rows(dataframe: pd.DataFrame) -> list[list[Any]]:
         [serialize_cell(cell) for cell in row]
         for row in sanitized_dataframe.values.tolist()
     ]
+
+
+def emit_success(result: dict[str, Any]) -> None:
+    sys.stdout.write(json.dumps(result, ensure_ascii=False))
+    sys.stdout.flush()
+
+
+def emit_error(error_payload: dict[str, Any]) -> None:
+    sys.stderr.write(json.dumps(error_payload, ensure_ascii=False) + "\n")
+    sys.stderr.flush()
 
 
 def main() -> None:
@@ -268,7 +317,7 @@ def main() -> None:
         log("Построение DataFrame")
         input_dataframe = build_dataframe(request)
 
-        target_column = detect_target_column(request)
+        target_column = detect_target_column(request, input_dataframe)
         log(
             "DataFrame построен",
             rows=len(input_dataframe),
@@ -276,25 +325,26 @@ def main() -> None:
             targetColumn=target_column,
         )
 
-        log("Импорт synthcity")
-        from synthcity.plugins import Plugins
-        from synthcity.plugins.core.dataloader import GenericDataLoader
+        with redirect_native_stdout_to_stderr():
+            log("Импорт synthcity")
+            from synthcity.plugins import Plugins
+            from synthcity.plugins.core.dataloader import GenericDataLoader
 
-        log("Подготовка DataLoader")
-        data_loader = (
-            GenericDataLoader(input_dataframe, target_column=target_column)
-            if target_column
-            else GenericDataLoader(input_dataframe)
-        )
+            log("Подготовка DataLoader")
+            data_loader = (
+                GenericDataLoader(input_dataframe, target_column=target_column)
+                if target_column
+                else GenericDataLoader(input_dataframe)
+            )
 
-        log("Получение плагина", plugin=request.method, rawMethod=request.rawMethod)
-        plugin = Plugins().get(request.method)
+            log("Получение плагина", plugin=request.method, rawMethod=request.rawMethod)
+            plugin = Plugins().get(request.method)
 
-        log("Обучение плагина")
-        plugin.fit(data_loader)
+            log("Обучение плагина")
+            plugin.fit(data_loader)
 
-        log("Генерация синтетических данных", count=request.recordCount)
-        generated_dataframe = plugin.generate(count=request.recordCount).dataframe()
+            log("Генерация синтетических данных", count=request.recordCount)
+            generated_dataframe = plugin.generate(count=request.recordCount).dataframe()
 
         log(
             "Генерация завершена",
@@ -302,7 +352,6 @@ def main() -> None:
             generatedColumns=len(generated_dataframe.columns),
         )
 
-        log("Сериализация результата")
         result = {
             "ok": True,
             "method": request.method,
@@ -313,8 +362,7 @@ def main() -> None:
         }
 
         log("Отправка JSON-ответа в stdout")
-        sys.stdout.write(json.dumps(result, ensure_ascii=False))
-        sys.stdout.flush()
+        emit_success(result)
 
         log("Скрипт завершён успешно")
         sys.exit(0)
@@ -327,8 +375,7 @@ def main() -> None:
             "ok": False,
             "error": str(error),
         }
-        sys.stderr.write(json.dumps(error_payload, ensure_ascii=False) + "\n")
-        sys.stderr.flush()
+        emit_error(error_payload)
         sys.exit(1)
 
 

@@ -14,6 +14,7 @@ const PYTHON_SCRIPT_PATH = path.resolve(
   PROJECT_ROOT,
   "services/synthcity-engine/app/generate.py",
 );
+
 const DEFAULT_PORT = 8001;
 
 const app = express();
@@ -40,6 +41,77 @@ async function ensurePathExists(targetPath, label) {
   } catch {
     throw new Error(`${label} не найден: ${targetPath}`);
   }
+}
+
+function safeJsonParse(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function extractTaggedJson(buffer, tag) {
+  const lines = buffer
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+
+    if (!line.startsWith(tag)) {
+      continue;
+    }
+
+    const parsed = safeJsonParse(line.slice(tag.length).trim());
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function extractLastJsonObject(buffer) {
+  const lines = buffer
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+
+    if (!line.startsWith("{") || !line.endsWith("}")) {
+      continue;
+    }
+
+    const parsed = safeJsonParse(line);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  const firstBraceIndex = buffer.indexOf("{");
+  const lastBraceIndex = buffer.lastIndexOf("}");
+
+  if (
+    firstBraceIndex !== -1 &&
+    lastBraceIndex !== -1 &&
+    lastBraceIndex > firstBraceIndex
+  ) {
+    const candidate = buffer.slice(firstBraceIndex, lastBraceIndex + 1).trim();
+    const parsed = safeJsonParse(candidate);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function extractWorkerPayload(buffer, tag) {
+  return extractTaggedJson(buffer, tag) ?? extractLastJsonObject(buffer);
 }
 
 app.get("/health", (_req, res) => {
@@ -76,12 +148,12 @@ app.post("/api/generate", async (req, res) => {
     let stderrBuffer = "";
 
     pythonProcess.stdout.on("data", (chunk) => {
-      const text = chunk.toString();
+      const text = chunk.toString("utf8");
       stdoutBuffer += text;
     });
 
     pythonProcess.stderr.on("data", (chunk) => {
-      const text = chunk.toString();
+      const text = chunk.toString("utf8");
       stderrBuffer += text;
       process.stderr.write(`[PYTHON] ${text}`);
     });
@@ -103,36 +175,37 @@ app.post("/api/generate", async (req, res) => {
       }
 
       if (exitCode !== 0) {
-        let parsedError = { ok: false, error: "Ошибка Python worker" };
-
-        if (stderrBuffer.trim()) {
-          try {
-            parsedError = JSON.parse(stderrBuffer);
-          } catch {
-            parsedError = { ok: false, error: stderrBuffer.trim() };
-          }
-        }
+        const parsedError = extractWorkerPayload(stderrBuffer, "__ERROR__") ??
+          extractWorkerPayload(stdoutBuffer, "__ERROR__") ?? {
+            ok: false,
+            error:
+              stderrBuffer.trim() ||
+              stdoutBuffer.trim() ||
+              "Ошибка Python worker",
+          };
 
         res.status(500).json(parsedError);
         return;
       }
 
-      try {
-        const parsedStdout = JSON.parse(stdoutBuffer);
-        res.json(parsedStdout);
-      } catch (error) {
+      const parsedResult =
+        extractWorkerPayload(stdoutBuffer, "__RESULT__") ??
+        extractWorkerPayload(stderrBuffer, "__RESULT__");
+
+      if (!parsedResult) {
         res.status(500).json({
           ok: false,
-          error:
-            error instanceof Error
-              ? `Некорректный JSON от Python worker: ${error.message}`
-              : "Некорректный JSON от Python worker",
-          raw: stdoutBuffer.trim(),
+          error: "Не удалось извлечь JSON-ответ Python worker",
+          rawStdout: stdoutBuffer.trim(),
+          rawStderr: stderrBuffer.trim(),
         });
+        return;
       }
+
+      res.json(parsedResult);
     });
 
-    pythonProcess.stdin.write(JSON.stringify(req.body));
+    pythonProcess.stdin.write(JSON.stringify(req.body), "utf8");
     pythonProcess.stdin.end();
   } catch (error) {
     res.status(500).json({
@@ -146,6 +219,7 @@ app.post("/api/generate", async (req, res) => {
 });
 
 const port = Number(process.env.SERVER_PORT ?? DEFAULT_PORT);
+
 app.listen(port, () => {
   console.log(`Node backend запущен на http://localhost:${port}`);
 });
