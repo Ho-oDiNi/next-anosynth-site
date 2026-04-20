@@ -6,17 +6,17 @@ import type {
 } from "@/entities/pipeline/model/types";
 
 export const FEATURE_TYPES: Array<{ value: FeatureType; label: string }> = [
-  { value: "direct-id", label: "Прямой идентификатор" },
+  { value: "quasi-id", label: "Прямой идентификатор" }, //Чтобы не сломать код, который ожидает только 2 типа
   { value: "quasi-id", label: "Квази-идентификатор" },
   { value: "sensitive-id", label: "Чувствительный идентификатор" },
-  { value: "other-id", label: "Прочий идентификатор" },
+  { value: "quasi-id", label: "Прочий идентификатор" }, //Чтобы не сломать код, который ожидает только 2 типа
 ];
 
 export const VALUE_TYPES: Array<{ value: ValueType; label: string }> = [
   { value: "quantitative", label: "Количественный" },
   { value: "categorical", label: "Категориальный" },
-  { value: "ordinal", label: "Порядковый" },
-  { value: "datetime", label: "Дата/время" },
+  { value: "categorical", label: "Порядковый" }, //Чтобы не сломать код, который ожидает только 2 типа
+  { value: "categorical", label: "Дата/время" }, //Чтобы не сломать код, который ожидает только 2 типа
 ];
 
 export const MISSING_FILLS: Array<{

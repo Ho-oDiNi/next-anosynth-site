@@ -398,7 +398,7 @@ export const ControlPanel = ({
                       updateGenerationParam("testSplit", value)
                     }
                     min={0}
-                    max={100}
+                    max={50}
                     step={1}
                   />
                 </div>
