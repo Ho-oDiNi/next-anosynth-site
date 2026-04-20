@@ -180,6 +180,10 @@ class ColumnMetaSchema:
     valueType: str = ""
     missingFill: str = ""
     role: str = "feature"
+    postprocessMinValue: str = ""
+    postprocessMaxValue: str = ""
+    postprocessIntegerOnly: bool = False
+    postprocessAllowedValues: str = ""
 
 
 @dataclass(slots=True)
@@ -298,6 +302,10 @@ def parse_column_meta(raw_meta: Any) -> dict[int, ColumnMetaSchema]:
         value_type = value_dict.get("valueType", "")
         missing_fill = value_dict.get("missingFill", "")
         role = value_dict.get("role", "feature")
+        postprocess_min_value = value_dict.get("postprocessMinValue", "")
+        postprocess_max_value = value_dict.get("postprocessMaxValue", "")
+        postprocess_integer_only = value_dict.get("postprocessIntegerOnly", False)
+        postprocess_allowed_values = value_dict.get("postprocessAllowedValues", "")
 
         if not isinstance(feature_type, str):
             raise ValueError(f"columnMeta[{raw_key}].featureType должен быть строкой")
@@ -317,11 +325,27 @@ def parse_column_meta(raw_meta: Any) -> dict[int, ColumnMetaSchema]:
                 f"{', '.join(sorted(VALID_ROLES))}"
             )
 
+        if not isinstance(postprocess_min_value, str):
+            raise ValueError(f"columnMeta[{raw_key}].postprocessMinValue должен быть строкой")
+
+        if not isinstance(postprocess_max_value, str):
+            raise ValueError(f"columnMeta[{raw_key}].postprocessMaxValue должен быть строкой")
+
+        if not isinstance(postprocess_integer_only, bool):
+            raise ValueError(f"columnMeta[{raw_key}].postprocessIntegerOnly должен быть boolean")
+
+        if not isinstance(postprocess_allowed_values, str):
+            raise ValueError(f"columnMeta[{raw_key}].postprocessAllowedValues должен быть строкой")
+
         result[column_index] = ColumnMetaSchema(
             featureType=feature_type,
             valueType=value_type,
             missingFill=missing_fill,
             role=role,
+            postprocessMinValue=postprocess_min_value,
+            postprocessMaxValue=postprocess_max_value,
+            postprocessIntegerOnly=postprocess_integer_only,
+            postprocessAllowedValues=postprocess_allowed_values,
         )
 
     return result
@@ -566,39 +590,82 @@ def _is_missing(value: Any) -> bool:
         return False
 
 
-def _build_constraint_detectors(real_df: pd.DataFrame) -> list[tuple[str, Any]]:
+def _parse_optional_float(raw_value: str) -> float | None:
+    normalized_value = raw_value.strip()
+    if normalized_value == "":
+        return None
+
+    try:
+        return float(normalized_value)
+    except Exception:
+        return None
+
+
+def _parse_allowed_values(raw_value: str) -> list[str]:
+    return [part.strip() for part in raw_value.split(",") if part.strip() != ""]
+
+
+def _build_constraint_detectors(
+    synth_df: pd.DataFrame,
+    column_meta: dict[int, ColumnMetaSchema],
+) -> list[tuple[str, Any]]:
     detectors: list[tuple[str, Any]] = []
 
-    for column_name in real_df.columns:
-        real_series = real_df[column_name]
-        non_null_real = real_series.dropna()
-
-        if non_null_real.empty:
+    for column_index, metadata in column_meta.items():
+        if column_index < 0 or column_index >= len(synth_df.columns):
             continue
 
-        numeric_real = pd.to_numeric(non_null_real, errors="coerce")
-        numeric_non_null = numeric_real.dropna()
-        numeric_ratio = len(numeric_non_null) / len(non_null_real)
-        is_numeric_constraint = numeric_ratio >= 0.9
+        column_name = synth_df.columns[column_index]
 
-        if is_numeric_constraint:
-            lower_bound = float(numeric_non_null.min())
-            upper_bound = float(numeric_non_null.max())
+        if metadata.valueType == "quantitative":
+            min_value = _parse_optional_float(metadata.postprocessMinValue)
+            max_value = _parse_optional_float(metadata.postprocessMaxValue)
+            has_integer_constraint = metadata.postprocessIntegerOnly
+
+            if min_value is None and max_value is None and not has_integer_constraint:
+                continue
 
             def numeric_detector(
                 synth_series: pd.Series,
-                min_value: float = lower_bound,
-                max_value: float = upper_bound,
+                min_limit: float | None = min_value,
+                max_limit: float | None = max_value,
+                integer_only: bool = has_integer_constraint,
             ) -> pd.Series:
                 numeric_values = pd.to_numeric(synth_series, errors="coerce")
-                out_of_range = (numeric_values < min_value) | (numeric_values > max_value)
+
+                out_of_range = pd.Series(False, index=synth_series.index, dtype=bool)
+                if min_limit is not None:
+                    out_of_range = out_of_range | (numeric_values < min_limit)
+                if max_limit is not None:
+                    out_of_range = out_of_range | (numeric_values > max_limit)
+
+                integer_violations = pd.Series(False, index=synth_series.index, dtype=bool)
+                if integer_only:
+                    rounded_values = np.round(numeric_values)
+                    integer_violations = (numeric_values != rounded_values)
+
                 missing_values = synth_series.apply(_is_missing)
-                return (out_of_range.fillna(True) | missing_values).astype(bool)
+                nan_after_conversion = numeric_values.isna()
+                violations = (
+                    out_of_range.fillna(False)
+                    | integer_violations.fillna(False)
+                    | missing_values
+                    | nan_after_conversion
+                )
+
+                return violations.astype(bool)
 
             detectors.append((column_name, numeric_detector))
             continue
 
-        allowed_values = set(non_null_real.astype(str).tolist())
+        if metadata.valueType != "categorical":
+            continue
+
+        allowed_values_list = _parse_allowed_values(metadata.postprocessAllowedValues)
+        if len(allowed_values_list) == 0:
+            continue
+
+        allowed_values = set(allowed_values_list)
 
         def categorical_detector(
             synth_series: pd.Series,
@@ -614,14 +681,22 @@ def _build_constraint_detectors(real_df: pd.DataFrame) -> list[tuple[str, Any]]:
     return detectors
 
 
-def evaluate_constraint_violation_metrics(real_df: pd.DataFrame, synth_df: pd.DataFrame) -> dict[str, float]:
-    detectors = _build_constraint_detectors(real_df)
+def evaluate_constraint_violation_metrics(
+    synth_df: pd.DataFrame,
+    column_meta: dict[int, ColumnMetaSchema],
+) -> dict[str, float]:
+    detectors = _build_constraint_detectors(synth_df=synth_df, column_meta=column_meta)
     synth_row_count = len(synth_df)
 
     if synth_row_count == 0:
         raise ValueError("Синтетический датасет пустой: невозможно вычислить CVR/CVC/sCVC")
     if len(detectors) == 0:
-        raise ValueError("Не удалось извлечь ограничения из исходных данных")
+        return {
+            "cvr": 1.0,
+            "cvc": 1.0,
+            "scvc": 1.0,
+            "constraints_count": 0.0,
+        }
 
     violation_matrix: list[pd.Series] = []
     for column_name, detector in detectors:
@@ -1365,7 +1440,10 @@ def evaluate_single_metric(
     if group == "sanity":
         if metric_name in {"cvr", "cvc", "scvc"}:
             real_df, synth_df = prepare_tabular_pair(real_df_raw, synth_df_raw, column_meta, fillna=False)
-            constraint_scores = evaluate_constraint_violation_metrics(real_df=real_df, synth_df=synth_df)
+            constraint_scores = evaluate_constraint_violation_metrics(
+                synth_df=synth_df,
+                column_meta=column_meta,
+            )
             return [{
                 "group": group,
                 "metric": metric_name,

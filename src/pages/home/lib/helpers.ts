@@ -21,6 +21,10 @@ export function createDefaultColumnMeta(values: string[] = []): ColumnMeta {
     valueType: detectValueType(values),
     missingFill: "delete-row",
     role: "feature",
+    postprocessMinValue: "",
+    postprocessMaxValue: "",
+    postprocessIntegerOnly: false,
+    postprocessAllowedValues: "",
   };
 }
 
