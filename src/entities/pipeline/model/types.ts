@@ -16,6 +16,8 @@ export type MissingFill =
   | "most-frequent"
   | "delete-row"
   | "";
+export type PostprocessSamplingQualityAction = "filtering" | "correction" | "";
+export type PostprocessCorrectionMethod = "mean" | "median" | "most-frequent" | "";
 export type ColumnRole = "feature" | "target";
 
 export interface ColumnMeta {
@@ -27,6 +29,8 @@ export interface ColumnMeta {
   postprocessMaxValue: string;
   postprocessIntegerOnly: boolean;
   postprocessAllowedValues: string;
+  postprocessSamplingQualityAction: PostprocessSamplingQualityAction;
+  postprocessCorrectionMethod: PostprocessCorrectionMethod;
 }
 
 export interface GenerationParams {
