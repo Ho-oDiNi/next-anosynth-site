@@ -36,7 +36,10 @@ function resolvePythonExecutable(engineName = "synthcity-engine") {
   }
 
   return process.platform === "win32"
-    ? path.resolve(PROJECT_ROOT, `services/${engineName}/.venv/Scripts/python.exe`)
+    ? path.resolve(
+        PROJECT_ROOT,
+        `services/${engineName}/.venv/Scripts/python.exe`,
+      )
     : path.resolve(PROJECT_ROOT, `services/${engineName}/.venv/bin/python`);
 }
 
@@ -152,6 +155,10 @@ const METRIC_LABELS = {
   domiasmia_bnaf: "DomiasMIA BNAF",
   dpcm: "DPCM",
   dcsm: "DCSM",
+  cvr: "CVR",
+  cvc: "CVC",
+  scvc: "SCVC",
+  delta_presence: "delta-presence",
 };
 
 const GROUP_BY_METRIC = {
@@ -178,6 +185,9 @@ const GROUP_BY_METRIC = {
   domiasmia_kde: "Атака ВЧ",
   domiasmia_prior: "Атака ВЧ",
   domiasmia_bnaf: "Атака ВЧ",
+  cvr: "Согласованность",
+  cvc: "Согласованность",
+  scvc: "Согласованность",
 };
 
 function resolvePrdcLabel(metricName) {
@@ -194,9 +204,13 @@ function formatEvaluationRow(rawRow) {
   const metricKey = normalizeMetricKey(rawRow?.metric);
   const baseMetricKey = metricRequestedKey || metricKey;
 
-  const metricLabel = metricRequestedKey === "prdc"
-    ? resolvePrdcLabel(metricKey)
-    : (METRIC_LABELS[baseMetricKey] ?? rawRow?.metricRequested ?? rawRow?.metric ?? "");
+  const metricLabel =
+    metricRequestedKey === "prdc"
+      ? resolvePrdcLabel(metricKey)
+      : (METRIC_LABELS[baseMetricKey] ??
+        rawRow?.metricRequested ??
+        rawRow?.metric ??
+        "");
 
   const groupLabel = GROUP_BY_METRIC[baseMetricKey] ?? rawRow?.group ?? "";
 
@@ -214,15 +228,19 @@ function runPythonWorker({
   requestPayload,
 }) {
   return new Promise((resolve, reject) => {
-    const pythonProcess = spawn(pythonExecutable, ["-X", "utf8", "-u", scriptPath], {
-      cwd,
-      env: {
-        ...process.env,
-        PYTHONUTF8: "1",
-        PYTHONIOENCODING: "utf-8",
+    const pythonProcess = spawn(
+      pythonExecutable,
+      ["-X", "utf8", "-u", scriptPath],
+      {
+        cwd,
+        env: {
+          ...process.env,
+          PYTHONUTF8: "1",
+          PYTHONIOENCODING: "utf-8",
+        },
+        stdio: ["pipe", "pipe", "pipe"],
       },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    );
 
     let stdoutBuffer = "";
     let stderrBuffer = "";
@@ -238,7 +256,9 @@ function runPythonWorker({
     });
 
     pythonProcess.on("error", (error) => {
-      reject(new Error(`Не удалось запустить Python-процесс: ${error.message}`));
+      reject(
+        new Error(`Не удалось запустить Python-процесс: ${error.message}`),
+      );
     });
 
     pythonProcess.on("close", (exitCode) => {
@@ -273,10 +293,7 @@ function runPythonWorker({
   });
 }
 
-function buildMetricWorkerPayload({
-  requestBody,
-  metrics,
-}) {
+function buildMetricWorkerPayload({ requestBody, metrics }) {
   return {
     ...requestBody,
     metrics,
@@ -335,14 +352,28 @@ app.post("/api/evaluate", async (req, res) => {
       return;
     }
 
-    const synthcityPythonExecutable = resolvePythonExecutable("synthcity-engine");
-    const sdmetricsPythonExecutable = resolvePythonExecutable("sdmetrics-engine");
+    const synthcityPythonExecutable =
+      resolvePythonExecutable("synthcity-engine");
+    const sdmetricsPythonExecutable =
+      resolvePythonExecutable("sdmetrics-engine");
 
     await Promise.all([
-      ensurePathExists(synthcityPythonExecutable, "Python executable synthcity"),
-      ensurePathExists(sdmetricsPythonExecutable, "Python executable sdmetrics"),
-      ensurePathExists(PYTHON_SYNTHCITY_EVALUATE_SCRIPT_PATH, "Скрипт evaluate.py"),
-      ensurePathExists(PYTHON_SDMETRICS_EVALUATE_SCRIPT_PATH, "Скрипт evalute.py"),
+      ensurePathExists(
+        synthcityPythonExecutable,
+        "Python executable synthcity",
+      ),
+      ensurePathExists(
+        sdmetricsPythonExecutable,
+        "Python executable sdmetrics",
+      ),
+      ensurePathExists(
+        PYTHON_SYNTHCITY_EVALUATE_SCRIPT_PATH,
+        "Скрипт evaluate.py",
+      ),
+      ensurePathExists(
+        PYTHON_SDMETRICS_EVALUATE_SCRIPT_PATH,
+        "Скрипт evalute.py",
+      ),
     ]);
 
     const workerCalls = [];
@@ -380,10 +411,11 @@ app.post("/api/evaluate", async (req, res) => {
     const mergedResults = responses
       .flatMap((item) => normalizeResultsArray(item.results))
       .map((row) => formatEvaluationRow(row));
-    const evaluationId = responses
-      .map((item) => item.evaluationId)
-      .filter(Boolean)
-      .join("+") || `evaluation-${Date.now()}`;
+    const evaluationId =
+      responses
+        .map((item) => item.evaluationId)
+        .filter(Boolean)
+        .join("+") || `evaluation-${Date.now()}`;
 
     res.json({
       ok: true,

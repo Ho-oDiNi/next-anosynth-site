@@ -47,7 +47,7 @@ function drawEvaluationResultsAsPng(rows: EvaluationMetricResult[]): Blob {
   context.fillText("Результаты оценивания", leftPadding, topPadding + 4);
 
   context.font = "bold 13px sans-serif";
-  const headers = ["Группа", "Метрика", "Запрошено", "Скор", "Ошибка"];
+  const headers = ["Группа", "Метрика", "Счет", "Ошибка"];
   const columns = [leftPadding, 180, 390, 700, 800];
   const headerY = topPadding + rowHeight * 2;
 
