@@ -142,83 +142,138 @@ function parsePostprocessingAllowedValues(rawValue: string): string[] {
     .filter((value) => value.length > 0);
 }
 
+function getPostprocessingCorrectionMethod(meta: ColumnMeta): ColumnMeta["missingFill"] {
+  if (meta.postprocessCorrectionMethod === "mean") {
+    return "mean";
+  }
+  if (meta.postprocessCorrectionMethod === "median") {
+    return "median";
+  }
+  return "most-frequent";
+}
+
+function isQuantitativeValueViolatingRules(
+  rawCellValue: string | undefined,
+  meta: ColumnMeta,
+): boolean {
+  if (isMissingValue(rawCellValue)) {
+    return false;
+  }
+
+  const numericValue = Number(rawCellValue);
+  if (Number.isNaN(numericValue)) {
+    return true;
+  }
+
+  const minValue =
+    meta.postprocessMinValue.trim() === ""
+      ? null
+      : Number(meta.postprocessMinValue);
+  const maxValue =
+    meta.postprocessMaxValue.trim() === ""
+      ? null
+      : Number(meta.postprocessMaxValue);
+  const hasValidMin = minValue !== null && !Number.isNaN(minValue);
+  const hasValidMax = maxValue !== null && !Number.isNaN(maxValue);
+
+  if (hasValidMin && minValue !== null && numericValue < minValue) {
+    return true;
+  }
+
+  if (hasValidMax && maxValue !== null && numericValue > maxValue) {
+    return true;
+  }
+
+  if (meta.postprocessIntegerOnly && !Number.isInteger(numericValue)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isCategoricalValueViolatingRules(
+  rawCellValue: string | undefined,
+  meta: ColumnMeta,
+): boolean {
+  if (isMissingValue(rawCellValue)) {
+    return false;
+  }
+
+  const allowedValues = parsePostprocessingAllowedValues(
+    meta.postprocessAllowedValues,
+  );
+  if (allowedValues.length === 0) {
+    return false;
+  }
+
+  return !new Set(allowedValues).has(rawCellValue as string);
+}
+
 function applyPostprocessing(
   data: string[][],
   columnMeta: Record<number, ColumnMeta>,
 ): string[][] {
-  const nextData = data.map((row) => [...row]);
+  let nextData = data.map((row) => [...row]);
 
   for (const [columnIndexAsText, meta] of Object.entries(columnMeta)) {
     const columnIndex = Number(columnIndexAsText);
+    const samplingQualityAction = meta.postprocessSamplingQualityAction || "filtering";
 
-    if (meta.valueType === "quantitative") {
-      const minValue =
-        meta.postprocessMinValue.trim() === ""
-          ? null
-          : Number(meta.postprocessMinValue);
-      const maxValue =
-        meta.postprocessMaxValue.trim() === ""
-          ? null
-          : Number(meta.postprocessMaxValue);
-      const hasValidMin = minValue !== null && !Number.isNaN(minValue);
-      const hasValidMax = maxValue !== null && !Number.isNaN(maxValue);
-
-      for (const row of nextData) {
-        const rawCellValue = row[columnIndex];
-
-        if (isMissingValue(rawCellValue)) {
-          continue;
-        }
-
-        const numericValue = Number(rawCellValue);
-        if (Number.isNaN(numericValue)) {
-          continue;
-        }
-
-        let normalizedValue = numericValue;
-
-        if (hasValidMin && minValue !== null) {
-          normalizedValue = Math.max(normalizedValue, minValue);
-        }
-
-        if (hasValidMax && maxValue !== null) {
-          normalizedValue = Math.min(normalizedValue, maxValue);
-        }
-
-        if (meta.postprocessIntegerOnly) {
-          normalizedValue = Math.round(normalizedValue);
-        }
-
-        row[columnIndex] = String(normalizedValue);
+    const getIsViolating = (rawCellValue: string | undefined): boolean => {
+      if (meta.valueType === "quantitative") {
+        return isQuantitativeValueViolatingRules(rawCellValue, meta);
       }
 
+      if (meta.valueType === "categorical") {
+        return isCategoricalValueViolatingRules(rawCellValue, meta);
+      }
+
+      return false;
+    };
+
+    if (samplingQualityAction === "filtering") {
+      nextData = nextData.filter((row) => !getIsViolating(row[columnIndex]));
       continue;
     }
 
-    if (meta.valueType !== "categorical") {
-      continue;
-    }
+    if (meta.valueType === "quantitative") {
+      const validValues = nextData
+        .map((row) => row[columnIndex])
+        .filter(
+          (rawCellValue): rawCellValue is string =>
+            !isMissingValue(rawCellValue) && !getIsViolating(rawCellValue),
+        );
+      const correctionMethod = getPostprocessingCorrectionMethod(meta);
+      const replacementValue = getFillValue(correctionMethod, validValues);
 
-    const allowedValues = parsePostprocessingAllowedValues(
-      meta.postprocessAllowedValues,
-    );
-
-    if (allowedValues.length === 0) {
-      continue;
-    }
-
-    const allowedValueSet = new Set(allowedValues);
-    const fallbackValue = allowedValues[0];
-
-    for (const row of nextData) {
-      const rawCellValue = row[columnIndex];
-
-      if (isMissingValue(rawCellValue)) {
+      if (!replacementValue) {
         continue;
       }
 
-      if (!allowedValueSet.has(rawCellValue)) {
-        row[columnIndex] = fallbackValue;
+      for (const row of nextData) {
+        if (getIsViolating(row[columnIndex])) {
+          row[columnIndex] = replacementValue;
+        }
+      }
+    }
+
+    if (meta.valueType === "categorical") {
+      const validValues = nextData
+        .map((row) => row[columnIndex])
+        .filter(
+          (rawCellValue): rawCellValue is string =>
+            !isMissingValue(rawCellValue) && !getIsViolating(rawCellValue),
+        );
+      const replacementValue = getFillValue("most-frequent", validValues);
+
+      if (!replacementValue) {
+        continue;
+      }
+
+      for (const row of nextData) {
+        if (getIsViolating(row[columnIndex])) {
+          row[columnIndex] = replacementValue;
+        }
       }
     }
   }

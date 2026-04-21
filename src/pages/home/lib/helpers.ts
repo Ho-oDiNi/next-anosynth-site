@@ -25,6 +25,8 @@ export function createDefaultColumnMeta(values: string[] = []): ColumnMeta {
     postprocessMaxValue: "",
     postprocessIntegerOnly: false,
     postprocessAllowedValues: "",
+    postprocessSamplingQualityAction: "filtering",
+    postprocessCorrectionMethod: "most-frequent",
   };
 }
 

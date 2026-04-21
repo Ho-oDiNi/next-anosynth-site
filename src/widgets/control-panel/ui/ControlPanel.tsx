@@ -33,6 +33,8 @@ import {
   LDIVERSITY_OPTIONS,
   MEMBERSHIP_OPTIONS,
   MISSING_FILLS,
+  POSTPROCESS_CORRECTION_METHODS,
+  POSTPROCESS_SAMPLING_QUALITY_ACTIONS,
   REALISM_JOINT_OPTIONS,
   REALISM_PAIRWISE_OPTIONS,
   REALISM_SINGLE_FEATURE_OPTIONS,
@@ -108,6 +110,13 @@ export const ControlPanel = ({
   const availableMissingFills = useMemo(
     () =>
       MISSING_FILLS.filter((item) => !item.quantitativeOnly || isQuantitative),
+    [isQuantitative],
+  );
+  const availablePostprocessCorrectionMethods = useMemo(
+    () =>
+      POSTPROCESS_CORRECTION_METHODS.filter(
+        (item) => !item.quantitativeOnly || isQuantitative,
+      ),
     [isQuantitative],
   );
 
@@ -414,6 +423,64 @@ export const ControlPanel = ({
                     {headers[selectedCol]}
                   </p>
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Улучшение качества выборки
+                  </label>
+                  <Select
+                    value={currentMeta?.postprocessSamplingQualityAction || ""}
+                    onValueChange={(value) =>
+                      onColumnMetaChange(selectedCol, {
+                        postprocessSamplingQualityAction: value as
+                          | "filtering"
+                          | "correction",
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Не задано" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" side="left">
+                      {POSTPROCESS_SAMPLING_QUALITY_ACTIONS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {currentMeta?.postprocessSamplingQualityAction ===
+                  "correction" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Метод коррекции
+                    </label>
+                    <Select
+                      value={currentMeta?.postprocessCorrectionMethod || ""}
+                      onValueChange={(value) =>
+                        onColumnMetaChange(selectedCol, {
+                          postprocessCorrectionMethod: value as
+                            | "mean"
+                            | "median"
+                            | "most-frequent",
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Не задано" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" side="left">
+                        {availablePostprocessCorrectionMethods.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {isQuantitative && (
                   <>

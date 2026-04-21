@@ -1,8 +1,10 @@
 import type {
   FeatureType,
-  ValueType,
   MissingFill,
+  PostprocessCorrectionMethod,
+  PostprocessSamplingQualityAction,
   StepName,
+  ValueType,
 } from "@/entities/pipeline/model/types";
 
 export const FEATURE_TYPES: Array<{ value: FeatureType; label: string }> = [
@@ -28,6 +30,24 @@ export const MISSING_FILLS: Array<{
   { value: "median", label: "Медиана", quantitativeOnly: true },
   { value: "most-frequent", label: "Наиболее частое" },
   { value: "delete-row", label: "Удаление строки" },
+];
+
+export const POSTPROCESS_SAMPLING_QUALITY_ACTIONS: Array<{
+  value: PostprocessSamplingQualityAction;
+  label: string;
+}> = [
+  { value: "filtering", label: "Фильтрация" },
+  { value: "correction", label: "Коррекция" },
+];
+
+export const POSTPROCESS_CORRECTION_METHODS: Array<{
+  value: PostprocessCorrectionMethod;
+  label: string;
+  quantitativeOnly?: boolean;
+}> = [
+  { value: "mean", label: "Среднее значение", quantitativeOnly: true },
+  { value: "median", label: "Медиана", quantitativeOnly: true },
+  { value: "most-frequent", label: "Наиболее частое значение" },
 ];
 
 export const GENERATION_METHODS = [
