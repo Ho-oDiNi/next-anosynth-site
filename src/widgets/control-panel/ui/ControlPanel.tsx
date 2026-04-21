@@ -1,12 +1,5 @@
 import { useMemo, useRef } from "react";
-import {
-  Download,
-  FileImage,
-  FileSpreadsheet,
-  Loader2,
-  Lock,
-  Upload,
-} from "lucide-react";
+import { FileImage, FileSpreadsheet, Lock } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -18,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { Tabs, TabsContent } from "@/shared/ui/tabs";
 
 import type {
   ColumnMeta,
@@ -44,13 +37,15 @@ import {
   REALISM_PAIRWISE_OPTIONS,
   REALISM_SINGLE_FEATURE_OPTIONS,
   REIDENTIFICATION_OPTIONS,
-  STEP_TABS,
   STRUCTURAL_OPTIONS,
   TSTR_OPTIONS,
   VALUE_TYPES,
 } from "../config";
 import { CheckItem } from "./CheckItem";
 import { CollapsibleSection } from "./CollapsibleSection";
+import { ControlPanelActions } from "./ControlPanelActions";
+import { ControlPanelStepFooter } from "./ControlPanelStepFooter";
+import { ControlPanelTabsList } from "./ControlPanelTabsList";
 
 interface ControlPanelProps {
   onUpload: (file: File) => void;
@@ -189,46 +184,19 @@ export const ControlPanel = ({
         onChange={handleFileChange}
       />
 
-      <div className="flex gap-2 border-b border-border p-4">
-        <Button
-          onClick={openFileDialog}
-          className="flex-1 gap-2"
-          variant="outline"
-        >
-          <Upload className="h-4 w-4" />
-          Загрузить CSV
-        </Button>
-
-        <Button
-          onClick={onDownload}
-          disabled={!hasData}
-          className="flex-1 gap-2"
-          variant={isResults ? "default" : "outline"}
-        >
-          <Download className="h-4 w-4" />
-          Скачать CSV
-        </Button>
-      </div>
+      <ControlPanelActions
+        hasData={hasData}
+        isResultsStep={isResults}
+        onUploadClick={openFileDialog}
+        onDownload={onDownload}
+      />
 
       <Tabs
         value={activeStep}
         onValueChange={(value) => onTabChange(value as StepName)}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <TabsList className="flex justify-between h-auto w-full rounded-none border-b border-border bg-secondary p-0 flex-wrap">
-          {STEP_TABS.map((tab) => (
-            <TabsTrigger
-              key={tab.value}
-              value={tab.value}
-              className="relative rounded-none border-b-2 border-transparent px-1.5 py-2 text-xs data-[state=active]:border-primary data-[state=active]:bg-card"
-            >
-              {tab.label}
-              {isStepLocked(tab.value) && tab.value !== "preprocessing" && (
-                <Lock className="ml-0.5 inline h-3 w-3 opacity-50" />
-              )}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <ControlPanelTabsList isStepLocked={isStepLocked} />
 
         <div className="min-h-0 flex-1 overflow-auto">
           <TabsContent value="preprocessing" className="m-0 space-y-4 p-4">
@@ -744,20 +712,14 @@ export const ControlPanel = ({
           </TabsContent>
         </div>
 
-        {activeStep !== "results" && hasData && (
-          <div className="shrink-0 border-t border-border p-4">
-            <Button
-              onClick={onStepNext}
-              disabled={
-                processing || isStepLocked(activeStep) || !isCurrentStepValid
-              }
-              className="w-full gap-2"
-            >
-              {processing && <Loader2 className="h-4 w-4 animate-spin" />}
-              Далее
-            </Button>
-          </div>
-        )}
+        <ControlPanelStepFooter
+          activeStep={activeStep}
+          hasData={hasData}
+          processing={processing}
+          isCurrentStepValid={isCurrentStepValid}
+          isStepLocked={isStepLocked}
+          onStepNext={onStepNext}
+        />
       </Tabs>
     </div>
   );

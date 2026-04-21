@@ -2,13 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ColumnMeta, StepName } from "@/entities/pipeline/model/types";
 
-import { CsvDataCell } from "./CsvDataCell";
-import { CsvHeaderCell } from "./CsvHeaderCell";
-import {
-  getDisplayHeaders,
-  getDisplayData,
-  isCellSelected,
-} from "../lib/utils";
+import { CsvTableBodyRows } from "./CsvTableBodyRows";
+import { CsvTableDragOverlay } from "./CsvTableDragOverlay";
+import { CsvTableHeaderRow } from "./CsvTableHeaderRow";
+import { getDisplayHeaders, getDisplayData } from "../lib/utils";
 
 interface CsvTableProps {
   headers: string[];
@@ -259,95 +256,43 @@ export function CsvTable({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {dragging && (
-        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10">
-          <span className="text-lg font-semibold text-primary">
-            Перетащите CSV файл сюда
-          </span>
-        </div>
-      )}
+      <CsvTableDragOverlay isVisible={dragging} />
 
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 z-10">
-          <tr>
-            <th className="w-10 border border-border/30 bg-table-header px-1 py-2 text-center text-xs font-semibold text-table-header-foreground">
-              #
-            </th>
-
-            {displayHeaders.map((header, colIndex) => (
-              <CsvHeaderCell
-                key={colIndex}
-                header={header}
-                colIndex={colIndex}
-                isExtra={colIndex >= realColCount}
-                isSelected={selectedCol === colIndex}
-                isEditing={editingHeader === colIndex}
-                meta={
-                  colIndex < realColCount ? columnMeta[colIndex] : undefined
-                }
-                activeStep={activeStep}
-                inputRef={inputRef}
-                onSelect={handleColSelect}
-                onStartEdit={handleHeaderDoubleClick}
-                onSubmitEdit={handleHeaderBlur}
-                onCancelEdit={() => setEditingHeader(null)}
-              />
-            ))}
-          </tr>
+          <CsvTableHeaderRow
+            displayHeaders={displayHeaders}
+            realColCount={realColCount}
+            selectedCol={selectedCol}
+            editingHeader={editingHeader}
+            columnMeta={columnMeta}
+            activeStep={activeStep}
+            inputRef={inputRef}
+            onColSelect={handleColSelect}
+            onHeaderDoubleClick={handleHeaderDoubleClick}
+            onHeaderSubmit={handleHeaderBlur}
+            onHeaderCancel={() => setEditingHeader(null)}
+          />
         </thead>
 
         <tbody>
-          {displayData.map((row, rowIndex) => {
-            const isExtraRow = rowIndex >= realRowCount;
-
-            return (
-              <tr key={rowIndex} className="group">
-                <td
-                  className={`cursor-pointer select-none border border-border bg-secondary px-1 py-1.5 text-center text-xs font-medium text-muted-foreground ${
-                    selectedRow === rowIndex
-                      ? "bg-table-selected font-bold"
-                      : ""
-                  } ${isExtraRow ? "opacity-40" : ""}`}
-                  onClick={() => handleRowSelect(rowIndex)}
-                >
-                  {isExtraRow ? "—" : rowIndex + 1}
-                </td>
-
-                {displayHeaders.map((_, colIndex) => {
-                  const isExtraCol = colIndex >= realColCount;
-                  const isExtra = isExtraRow || isExtraCol;
-                  const cellValue = row[colIndex] || "";
-                  const isEditing =
-                    editingCell?.row === rowIndex &&
-                    editingCell?.col === colIndex;
-
-                  return (
-                    <CsvDataCell
-                      key={colIndex}
-                      rowIndex={rowIndex}
-                      colIndex={colIndex}
-                      value={cellValue}
-                      isEmptyTable={isEmpty}
-                      isExtra={isExtra}
-                      isSelected={isCellSelected(
-                        selectedCell,
-                        selectedRow,
-                        selectedCol,
-                        rowIndex,
-                        colIndex,
-                      )}
-                      isEditing={isEditing}
-                      inputRef={inputRef}
-                      onClick={handleCellClick}
-                      onDoubleClick={handleCellDoubleClick}
-                      onSubmit={handleCellBlur}
-                      onCancel={() => setEditingCell(null)}
-                    />
-                  );
-                })}
-              </tr>
-            );
-          })}
+          <CsvTableBodyRows
+            displayData={displayData}
+            displayHeaders={displayHeaders}
+            realRowCount={realRowCount}
+            realColCount={realColCount}
+            selectedRow={selectedRow}
+            selectedCol={selectedCol}
+            selectedCell={selectedCell}
+            editingCell={editingCell}
+            isEmptyTable={isEmpty}
+            inputRef={inputRef}
+            onRowSelect={handleRowSelect}
+            onCellClick={handleCellClick}
+            onCellDoubleClick={handleCellDoubleClick}
+            onCellSubmit={handleCellBlur}
+            onCellCancel={() => setEditingCell(null)}
+          />
         </tbody>
       </table>
     </div>
