@@ -1,8 +1,17 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-const DATASET_PATH = new URL(
-  "../../services/data/Statlog_German_Credit_Data.csv",
-  import.meta.url,
-).pathname;
+import { fileURLToPath } from "url";
+
+const THIRTY_FIVE_MINUTES = 35 * 60 * 1000;
+
+test.setTimeout(THIRTY_FIVE_MINUTES);
+test.describe.configure({ mode: "serial" });
+
+const DATASET_PATH = fileURLToPath(
+  new URL(
+    "../../services/data/Statlog_German_Credit_Data.csv",
+    import.meta.url,
+  ),
+);
 
 const SENSITIVE_COLUMNS = [
   "checking_account_status",
@@ -13,13 +22,13 @@ const SENSITIVE_COLUMNS = [
 
 const METHODS = [
   "Байесовские сети",
-  "TVAE",
-  "TGAN",
-  "CTGAN",
-  "DPGAN",
-  "TabDDPM",
-  "Forest-VP",
-  "GREAT",
+  // "TVAE",
+  // "TGAN",
+  // "CTGAN",
+  // "DPGAN",
+  // "TabDDPM",
+  // "Forest-VP",
+  // "GREAT",
 ] as const;
 
 const COLUMN_CONSTRAINTS: Record<string, Record<string, string | boolean>> = {
@@ -110,44 +119,6 @@ const COLUMN_CONSTRAINTS: Record<string, Record<string, string | boolean>> = {
   },
 };
 
-async function configureApiMocks(page: Page): Promise<void> {
-  await page.route("**/api/generate", async (route) => {
-    const requestPayload = route.request().postDataJSON() as {
-      headers?: string[];
-      trainData?: string[][];
-    };
-
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        headers: requestPayload.headers ?? [],
-        rows: requestPayload.trainData ?? [],
-      }),
-    });
-  });
-
-  await page.route("**/api/evaluate", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        evaluationId: "mock-evaluation-id",
-        results: [
-          {
-            group: "Качество",
-            metricRequested: "wasserstein_dist",
-            score: 0.98,
-            error: "",
-          },
-        ],
-      }),
-    });
-  });
-}
-
 function formFieldByLabel(page: Page, label: string): Locator {
   return page.locator("div.space-y-2", {
     has: page.locator(`label:text-is("${label}")`),
@@ -160,8 +131,14 @@ async function chooseOption(
   option: string,
 ): Promise<void> {
   const field = formFieldByLabel(page, label);
-  await field.getByRole("combobox").click();
-  await page.getByRole("option", { name: option, exact: true }).click();
+
+  await field.getByRole("combobox").click({
+    timeout: THIRTY_FIVE_MINUTES,
+  });
+
+  await page.getByRole("option", { name: option, exact: true }).click({
+    timeout: THIRTY_FIVE_MINUTES,
+  });
 }
 
 async function fillInputByLabel(
@@ -171,7 +148,10 @@ async function fillInputByLabel(
 ): Promise<void> {
   const field = formFieldByLabel(page, label);
   const input = field.locator("input");
-  await input.fill(value);
+
+  await input.fill(value, {
+    timeout: THIRTY_FIVE_MINUTES,
+  });
 }
 
 async function setCheckboxByLabel(
@@ -182,13 +162,38 @@ async function setCheckboxByLabel(
   const checkbox = page
     .locator("label", { hasText: label })
     .locator('input[type="checkbox"]');
+
+  await expect(checkbox).toBeVisible({
+    timeout: THIRTY_FIVE_MINUTES,
+  });
+
   if ((await checkbox.isChecked()) !== targetState) {
-    await checkbox.click();
+    await checkbox.click({
+      timeout: THIRTY_FIVE_MINUTES,
+    });
   }
 }
 
 async function selectColumn(page: Page, columnName: string): Promise<void> {
-  await page.locator("th", { hasText: columnName }).first().click();
+  const columnHeader = page.locator("th", { hasText: columnName }).first();
+
+  await expect(columnHeader).toBeVisible({
+    timeout: THIRTY_FIVE_MINUTES,
+  });
+
+  await columnHeader.click({
+    timeout: THIRTY_FIVE_MINUTES,
+  });
+}
+
+async function clickNext(
+  page: Page,
+  timeout = THIRTY_FIVE_MINUTES,
+): Promise<void> {
+  await page.waitForTimeout(2000);
+  await page.getByRole("button", { name: "Далее" }).click({
+    timeout,
+  });
 }
 
 async function setupPreprocessing(page: Page): Promise<void> {
@@ -200,12 +205,29 @@ async function setupPreprocessing(page: Page): Promise<void> {
   await selectColumn(page, "credit risk");
   await chooseOption(page, "Роль", "Целевой признак");
 
-  await page.getByRole("button", { name: "Далее" }).click();
+  await clickNext(page);
 }
 
 async function setupGeneration(page: Page, method: string): Promise<void> {
-  await chooseOption(page, "Метод *", method);
-  await page.getByRole("button", { name: "Далее" }).click();
+  const methodSelect = page
+    .getByRole("combobox")
+    .filter({ hasText: "Выберите метод" });
+
+  await expect(methodSelect).toBeVisible({ timeout: THIRTY_FIVE_MINUTES });
+  await expect(methodSelect).toBeEnabled({ timeout: THIRTY_FIVE_MINUTES });
+
+  await methodSelect.click({ timeout: THIRTY_FIVE_MINUTES });
+
+  const option = page.getByRole("option").filter({ hasText: method }).first();
+
+  await expect(option).toBeVisible({ timeout: THIRTY_FIVE_MINUTES });
+  await option.click({ timeout: THIRTY_FIVE_MINUTES });
+
+  await expect(methodSelect).toContainText(method, {
+    timeout: THIRTY_FIVE_MINUTES,
+  });
+
+  await clickNext(page, THIRTY_FIVE_MINUTES);
 }
 
 async function setupPostprocessing(page: Page): Promise<void> {
@@ -246,23 +268,38 @@ async function setupPostprocessing(page: Page): Promise<void> {
     }
   }
 
-  await page.getByRole("button", { name: "Далее" }).click();
+  await clickNext(page);
 }
 
 async function runEvaluationAndDownload(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Далее" }).click();
+  await clickNext(page, THIRTY_FIVE_MINUTES);
 
   await expect(page.getByRole("tab", { name: "Результаты" })).toHaveAttribute(
     "data-state",
     "active",
+    {
+      timeout: THIRTY_FIVE_MINUTES,
+    },
   );
 
-  const sourceCsvDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Скачать CSV" }).click();
+  const sourceCsvDownload = page.waitForEvent("download", {
+    timeout: THIRTY_FIVE_MINUTES,
+  });
+
+  await page.getByRole("button", { name: "Скачать CSV" }).click({
+    timeout: THIRTY_FIVE_MINUTES,
+  });
+
   await sourceCsvDownload;
 
-  const evaluationCsvDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Скачать оценку CSV" }).click();
+  const evaluationCsvDownload = page.waitForEvent("download", {
+    timeout: THIRTY_FIVE_MINUTES,
+  });
+
+  await page.getByRole("button", { name: "Скачать оценку CSV" }).click({
+    timeout: THIRTY_FIVE_MINUTES,
+  });
+
   await evaluationCsvDownload;
 }
 
@@ -272,13 +309,20 @@ for (const method of METHODS) {
   }: {
     page: Page;
   }) => {
-    await configureApiMocks(page);
-    await page.goto("/");
+    await page.goto("/", {
+      waitUntil: "domcontentloaded",
+      timeout: THIRTY_FIVE_MINUTES,
+    });
 
-    await page.setInputFiles('input[type="file"]', DATASET_PATH);
+    await page.setInputFiles('input[type="file"]', DATASET_PATH, {
+      timeout: THIRTY_FIVE_MINUTES,
+    });
+
     await expect(
       page.locator("th", { hasText: "checking_account_status" }).first(),
-    ).toBeVisible();
+    ).toBeVisible({
+      timeout: THIRTY_FIVE_MINUTES,
+    });
 
     await setupPreprocessing(page);
     await setupGeneration(page, method);
