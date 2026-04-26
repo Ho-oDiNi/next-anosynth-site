@@ -57,7 +57,7 @@ export const GENERATION_METHODS = [
   "CTGAN",
   "DPGAN",
   "TabDDPM",
-  "SOS",
+  "Forest-VP",
   "GREAT",
   "EPIC",
 ] as const;
