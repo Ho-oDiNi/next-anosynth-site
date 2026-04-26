@@ -162,23 +162,27 @@ export function useHomePageModel() {
   const normalizedGenerationMethod = generationParams.method
     .trim()
     .replace(/^_+|_+$/g, "");
+  const sourceFileRowCount = data.length;
 
   const handleDownload = useCallback(() => {
     if (!hasData) {
       return;
     }
 
-    const processedFileName =
-      normalizedGenerationMethod.length > 0
-        ? `processed_data_${normalizedGenerationMethod}_${Date.now()}.csv`
-        : `processed_data_${Date.now()}.csv`;
+    const processedFileName = `processed_data_${normalizedGenerationMethod}_${sourceFileRowCount}_${Date.now()}.csv`;
 
     downloadTextFile({
       content: toCsv(headers, data),
       fileName: processedFileName,
       mimeType: "text/csv;charset=utf-8;",
     });
-  }, [data, hasData, headers, normalizedGenerationMethod]);
+  }, [
+    data,
+    hasData,
+    headers,
+    normalizedGenerationMethod,
+    sourceFileRowCount,
+  ]);
 
   const handleEvaluationCsvDownload = useCallback(() => {
     if (!evaluationReport || evaluationReport.rows.length === 0) {
@@ -192,10 +196,10 @@ export function useHomePageModel() {
 
     downloadTextFile({
       content: formatEvaluationResultsAsCsv(evaluationReport.rows),
-      fileName: `${evaluationFileNamePrefix}_${Date.now()}.csv`,
+      fileName: `${evaluationFileNamePrefix}_${sourceFileRowCount}_${Date.now()}.csv`,
       mimeType: "text/csv;charset=utf-8;",
     });
-  }, [evaluationReport, normalizedGenerationMethod]);
+  }, [evaluationReport, normalizedGenerationMethod, sourceFileRowCount]);
 
   const handleEvaluationPngDownload = useCallback(() => {
     if (!evaluationReport || evaluationReport.rows.length === 0) {
@@ -208,8 +212,11 @@ export function useHomePageModel() {
         ? `evaluation_${normalizedGenerationMethod}`
         : "evaluation";
 
-    downloadBlob(pngBlob, `${evaluationFileNamePrefix}_${Date.now()}.png`);
-  }, [evaluationReport, normalizedGenerationMethod]);
+    downloadBlob(
+      pngBlob,
+      `${evaluationFileNamePrefix}_${sourceFileRowCount}_${Date.now()}.png`,
+    );
+  }, [evaluationReport, normalizedGenerationMethod, sourceFileRowCount]);
 
   return {
     headers,
