@@ -17,7 +17,11 @@ export type MissingFill =
   | "delete-row"
   | "";
 export type PostprocessSamplingQualityAction = "filtering" | "correction" | "";
-export type PostprocessCorrectionMethod = "mean" | "median" | "most-frequent" | "";
+export type PostprocessCorrectionMethod =
+  | "mean"
+  | "median"
+  | "most-frequent"
+  | "";
 export type ColumnRole = "feature" | "target";
 
 export interface ColumnMeta {

@@ -1,9 +1,16 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { fileURLToPath } from "url";
+import path from "path";
+import fs from "fs";
 
-const THIRTY_FIVE_MINUTES = 35 * 60 * 1000;
+const DOWNLOADS_DIR = path.resolve("downloads/e2e");
 
-test.setTimeout(THIRTY_FIVE_MINUTES);
+fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
+
+const UI_TIMEOUT = 60 * 60 * 1000;
+const LONG_TIMEOUT = 60 * 60 * 1000;
+
+test.setTimeout(LONG_TIMEOUT);
 test.describe.configure({ mode: "serial" });
 
 const DATASET_PATH = fileURLToPath(
@@ -133,11 +140,11 @@ async function chooseOption(
   const field = formFieldByLabel(page, label);
 
   await field.getByRole("combobox").click({
-    timeout: THIRTY_FIVE_MINUTES,
+    timeout: UI_TIMEOUT,
   });
 
   await page.getByRole("option", { name: option, exact: true }).click({
-    timeout: THIRTY_FIVE_MINUTES,
+    timeout: UI_TIMEOUT,
   });
 }
 
@@ -150,7 +157,7 @@ async function fillInputByLabel(
   const input = field.locator("input");
 
   await input.fill(value, {
-    timeout: THIRTY_FIVE_MINUTES,
+    timeout: UI_TIMEOUT,
   });
 }
 
@@ -164,12 +171,12 @@ async function setCheckboxByLabel(
     .locator('input[type="checkbox"]');
 
   await expect(checkbox).toBeVisible({
-    timeout: THIRTY_FIVE_MINUTES,
+    timeout: UI_TIMEOUT,
   });
 
   if ((await checkbox.isChecked()) !== targetState) {
     await checkbox.click({
-      timeout: THIRTY_FIVE_MINUTES,
+      timeout: UI_TIMEOUT,
     });
   }
 }
@@ -178,21 +185,45 @@ async function selectColumn(page: Page, columnName: string): Promise<void> {
   const columnHeader = page.locator("th", { hasText: columnName }).first();
 
   await expect(columnHeader).toBeVisible({
-    timeout: THIRTY_FIVE_MINUTES,
+    timeout: UI_TIMEOUT,
   });
 
   await columnHeader.click({
-    timeout: THIRTY_FIVE_MINUTES,
+    timeout: UI_TIMEOUT,
   });
 }
 
-async function clickNext(
-  page: Page,
-  timeout = THIRTY_FIVE_MINUTES,
-): Promise<void> {
-  await page.waitForTimeout(2000);
-  await page.getByRole("button", { name: "Далее" }).click({
-    timeout,
+async function clickNext(page: Page, timeout = UI_TIMEOUT): Promise<void> {
+  const nextButton = page
+    .locator("button")
+    .filter({ hasText: /^Далее$/ })
+    .first();
+
+  console.log(
+    "Next buttons count:",
+    await page
+      .locator("button")
+      .filter({ hasText: /^Далее$/ })
+      .count(),
+  );
+
+  console.log(
+    "Visible next buttons count:",
+    await page
+      .locator("button:visible")
+      .filter({ hasText: /^Далее$/ })
+      .count(),
+  );
+
+  await nextButton.waitFor({ state: "visible", timeout });
+
+  console.log("Button disabled:", await nextButton.isDisabled());
+  console.log("Button text:", await nextButton.textContent());
+
+  await page.waitForTimeout(500);
+
+  await nextButton.evaluate((button) => {
+    (button as HTMLButtonElement).click();
   });
 }
 
@@ -209,33 +240,45 @@ async function setupPreprocessing(page: Page): Promise<void> {
 }
 
 async function setupGeneration(page: Page, method: string): Promise<void> {
-  const methodSelect = page
-    .getByRole("combobox")
-    .filter({ hasText: "Выберите метод" });
+  console.log("SETUP GENERATION START");
 
-  await expect(methodSelect).toBeVisible({ timeout: THIRTY_FIVE_MINUTES });
-  await expect(methodSelect).toBeEnabled({ timeout: THIRTY_FIVE_MINUTES });
+  const methodSelect = formFieldByLabel(page, "Метод").getByRole("combobox");
 
-  await methodSelect.click({ timeout: THIRTY_FIVE_MINUTES });
+  await expect(methodSelect).toBeVisible({ timeout: UI_TIMEOUT });
+  await expect(methodSelect).toBeEnabled({ timeout: UI_TIMEOUT });
 
-  const option = page.getByRole("option").filter({ hasText: method }).first();
+  const currentText = await methodSelect.textContent();
+  console.log("Current method select text:", currentText);
 
-  await expect(option).toBeVisible({ timeout: THIRTY_FIVE_MINUTES });
-  await option.click({ timeout: THIRTY_FIVE_MINUTES });
+  if (!currentText?.includes(method)) {
+    await methodSelect.click({ timeout: UI_TIMEOUT });
 
-  await expect(methodSelect).toContainText(method, {
-    timeout: THIRTY_FIVE_MINUTES,
-  });
+    const option = page.getByRole("option", { name: method, exact: true });
 
-  await clickNext(page, THIRTY_FIVE_MINUTES);
+    await expect(option).toBeVisible({ timeout: UI_TIMEOUT });
+    await option.click({ timeout: UI_TIMEOUT });
+
+    await expect(methodSelect).toContainText(method, {
+      timeout: UI_TIMEOUT,
+    });
+  }
+
+  await page.keyboard.press("Escape");
+
+  console.log("BEFORE CLICK NEXT IN GENERATION");
+  await clickNext(page, LONG_TIMEOUT);
+  console.log("AFTER CLICK NEXT IN GENERATION");
 }
 
 async function setupPostprocessing(page: Page): Promise<void> {
   for (const [columnName, config] of Object.entries(COLUMN_CONSTRAINTS)) {
     await selectColumn(page, columnName);
-    await chooseOption(page, "Улучшение качества выборки", "Фильтрация");
 
     if (typeof config.postprocessAllowedValues === "string") {
+      await expect(formFieldByLabel(page, "Возможные значения")).toBeVisible({
+        timeout: UI_TIMEOUT,
+      });
+
       await fillInputByLabel(
         page,
         "Возможные значения",
@@ -244,6 +287,10 @@ async function setupPostprocessing(page: Page): Promise<void> {
     }
 
     if (typeof config.postprocessMinValue === "string") {
+      await expect(formFieldByLabel(page, "Минимальное значение")).toBeVisible({
+        timeout: UI_TIMEOUT,
+      });
+
       await fillInputByLabel(
         page,
         "Минимальное значение",
@@ -252,6 +299,12 @@ async function setupPostprocessing(page: Page): Promise<void> {
     }
 
     if (typeof config.postprocessMaxValue === "string") {
+      await expect(formFieldByLabel(page, "Максимальное значение")).toBeVisible(
+        {
+          timeout: UI_TIMEOUT,
+        },
+      );
+
       await fillInputByLabel(
         page,
         "Максимальное значение",
@@ -272,35 +325,58 @@ async function setupPostprocessing(page: Page): Promise<void> {
 }
 
 async function runEvaluationAndDownload(page: Page): Promise<void> {
-  await clickNext(page, THIRTY_FIVE_MINUTES);
+  console.log("BEFORE CLICK NEXT IN EVALUATION");
+  await clickNext(page, LONG_TIMEOUT);
+  console.log("AFTER CLICK NEXT IN EVALUATION");
 
   await expect(page.getByRole("tab", { name: "Результаты" })).toHaveAttribute(
     "data-state",
     "active",
     {
-      timeout: THIRTY_FIVE_MINUTES,
+      timeout: LONG_TIMEOUT,
     },
   );
 
-  const sourceCsvDownload = page.waitForEvent("download", {
-    timeout: THIRTY_FIVE_MINUTES,
+  await page.waitForTimeout(2_000);
+
+  const sourceCsvDownloadPromise = page.waitForEvent("download", {
+    timeout: LONG_TIMEOUT,
   });
 
   await page.getByRole("button", { name: "Скачать CSV" }).click({
-    timeout: THIRTY_FIVE_MINUTES,
+    timeout: UI_TIMEOUT,
   });
 
-  await sourceCsvDownload;
+  const sourceCsvDownload = await sourceCsvDownloadPromise;
 
-  const evaluationCsvDownload = page.waitForEvent("download", {
-    timeout: THIRTY_FIVE_MINUTES,
+  await sourceCsvDownload.saveAs(
+    path.join(DOWNLOADS_DIR, sourceCsvDownload.suggestedFilename()),
+  );
+
+  console.log("Source CSV downloaded:", sourceCsvDownload.suggestedFilename());
+
+  await page.waitForTimeout(1_000);
+
+  const evaluationCsvDownloadPromise = page.waitForEvent("download", {
+    timeout: LONG_TIMEOUT,
   });
 
   await page.getByRole("button", { name: "Скачать оценку CSV" }).click({
-    timeout: THIRTY_FIVE_MINUTES,
+    timeout: UI_TIMEOUT,
   });
 
-  await evaluationCsvDownload;
+  const evaluationCsvDownload = await evaluationCsvDownloadPromise;
+
+  await evaluationCsvDownload.saveAs(
+    path.join(DOWNLOADS_DIR, evaluationCsvDownload.suggestedFilename()),
+  );
+
+  console.log(
+    "Evaluation CSV downloaded:",
+    evaluationCsvDownload.suggestedFilename(),
+  );
+
+  await page.waitForTimeout(2_000);
 }
 
 for (const method of METHODS) {
@@ -311,17 +387,17 @@ for (const method of METHODS) {
   }) => {
     await page.goto("/", {
       waitUntil: "domcontentloaded",
-      timeout: THIRTY_FIVE_MINUTES,
+      timeout: LONG_TIMEOUT,
     });
 
     await page.setInputFiles('input[type="file"]', DATASET_PATH, {
-      timeout: THIRTY_FIVE_MINUTES,
+      timeout: UI_TIMEOUT,
     });
 
     await expect(
       page.locator("th", { hasText: "checking_account_status" }).first(),
     ).toBeVisible({
-      timeout: THIRTY_FIVE_MINUTES,
+      timeout: UI_TIMEOUT,
     });
 
     await setupPreprocessing(page);

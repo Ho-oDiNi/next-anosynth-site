@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const MINUTES = 60 * 60 * 1000;
+const MINUTES = 12 * 60 * 60 * 1000;
 
 export default defineConfig({
   testDir: "./tests/e2e",

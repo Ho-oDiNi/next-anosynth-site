@@ -161,7 +161,6 @@ export function useHomePageModel() {
   const hasData = headers.length > 0;
   const normalizedGenerationMethod = generationParams.method
     .trim()
-    .replace(/[^a-zA-Z0-9_-]+/g, "_")
     .replace(/^_+|_+$/g, "");
 
   const handleDownload = useCallback(() => {
@@ -171,8 +170,8 @@ export function useHomePageModel() {
 
     const processedFileName =
       normalizedGenerationMethod.length > 0
-        ? `processed_${normalizedGenerationMethod}_data.csv`
-        : "processed_data.csv";
+        ? `processed_${normalizedGenerationMethod}_data_${Date.now()}.csv`
+        : `processed_data_${Date.now()}.csv`;
 
     downloadTextFile({
       content: toCsv(headers, data),
