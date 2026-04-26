@@ -11,14 +11,7 @@ const UI_TIMEOUT = 60 * 60 * 1000;
 const LONG_TIMEOUT = 60 * 60 * 1000;
 
 test.setTimeout(LONG_TIMEOUT);
-test.describe.configure({ mode: "serial" });
-
-const DATASET_PATH = fileURLToPath(
-  new URL(
-    "../../services/data/Statlog_German_Credit_Data.csv",
-    import.meta.url,
-  ),
-);
+test.describe.configure({ mode: "default" });
 
 const SENSITIVE_COLUMNS = [
   "checking_account_status",
@@ -28,15 +21,22 @@ const SENSITIVE_COLUMNS = [
 ] as const;
 
 const METHODS = [
-  // "Байесовские сети",
-  // "TVAE",
-  // "TGAN",
-  // "CTGAN",
-  // "DPGAN",
-  // "TabDDPM",
-  // "Forest-VP",
+  "Байесовские сети",
+  "TVAE",
+  "TGAN",
+  "CTGAN",
+  "DPGAN",
+  "TabDDPM",
+  "Forest-VP",
   "GREAT",
 ] as const;
+
+const DATASET_GROUPS_IN_ORDER = [
+  [200, 400, 600, 800, 1000],
+  [100, 300, 500, 700, 900],
+] as const;
+
+const REPEAT_COUNT_PER_GROUP = 5;
 
 const COLUMN_CONSTRAINTS: Record<string, Record<string, string | boolean>> = {
   checking_account_status: {
@@ -379,30 +379,53 @@ async function runEvaluationAndDownload(page: Page): Promise<void> {
   await page.waitForTimeout(2_000);
 }
 
+function resolveDatasetPath(datasetSize: number): string {
+  return fileURLToPath(
+    new URL(
+      `../../services/data/Statlog_German_Credit_Data_${datasetSize}.csv`,
+      import.meta.url,
+    ),
+  );
+}
+
 for (const method of METHODS) {
-  test(`E2E: German Credit pipeline c методом ${method}`, async ({
-    page,
-  }: {
-    page: Page;
-  }) => {
-    await page.goto("/", {
-      waitUntil: "domcontentloaded",
-      timeout: LONG_TIMEOUT,
-    });
+  for (const datasetGroup of DATASET_GROUPS_IN_ORDER) {
+    for (const datasetSize of datasetGroup) {
+      for (
+        let groupRunNumber = 1;
+        groupRunNumber <= REPEAT_COUNT_PER_GROUP;
+        groupRunNumber += 1
+      ) {
+        test(`E2E: German Credit | метод ${method} | группа [${datasetGroup.join(", ")}] | прогон ${groupRunNumber}/${REPEAT_COUNT_PER_GROUP} | датасет ${datasetSize}`, async ({
+          page,
+        }: {
+          page: Page;
+        }) => {
+          await page.goto("/", {
+            waitUntil: "domcontentloaded",
+            timeout: LONG_TIMEOUT,
+          });
 
-    await page.setInputFiles('input[type="file"]', DATASET_PATH, {
-      timeout: UI_TIMEOUT,
-    });
+          await page.setInputFiles(
+            'input[type="file"]',
+            resolveDatasetPath(datasetSize),
+            {
+              timeout: UI_TIMEOUT,
+            },
+          );
 
-    await expect(
-      page.locator("th", { hasText: "checking_account_status" }).first(),
-    ).toBeVisible({
-      timeout: UI_TIMEOUT,
-    });
+          await expect(
+            page.locator("th", { hasText: "checking_account_status" }).first(),
+          ).toBeVisible({
+            timeout: UI_TIMEOUT,
+          });
 
-    await setupPreprocessing(page);
-    await setupGeneration(page, method);
-    await setupPostprocessing(page);
-    await runEvaluationAndDownload(page);
-  });
+          await setupPreprocessing(page);
+          await setupGeneration(page, method);
+          await setupPostprocessing(page);
+          await runEvaluationAndDownload(page);
+        });
+      }
+    }
+  }
 }
