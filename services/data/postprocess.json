@@ -1,0 +1,79 @@
+{
+  "checking_account_status": {
+    "postprocessAllowedValues": "< 0 DM, 0 ≤ … < 200 DM, ≥ 200 DM, no checking account"
+  },
+  "duration": {
+    "postprocessMinValue": "4",
+    "postprocessMaxValue": "72",
+    "postprocessIntegerOnly": true
+  },
+  "credit_history": {
+    "postprocessAllowedValues": "critical account / other credits existing, existing credits paid back duly till now, delay in paying off in the past, no credits taken / all paid back duly, all credits paid back at this bank"
+  },
+  "purpose": {
+    "postprocessAllowedValues": "radio/TV, education, furniture/equipment, car (new), car (used), business, domestic appliances, repairs, others, retraining"
+  },
+  "credit_amount": {
+    "postprocessMinValue": "250",
+    "postprocessMaxValue": "18424",
+    "postprocessIntegerOnly": true
+  },
+  "savings_account": {
+    "postprocessAllowedValues": "unknown / no savings account, < 100 DM, 100 ≤ … < 500 DM, 500 ≤ … < 1000 DM, ≥ 1000 DM"
+  },
+  "employment_duration": {
+    "postprocessAllowedValues": "unemployed, < 1 year, 1 ≤ … < 4 years, 4 ≤ … < 7 years, ≥ 7 years"
+  },
+  "installment_rate": {
+    "postprocessMinValue": "1",
+    "postprocessMaxValue": "4",
+    "postprocessIntegerOnly": true
+  },
+  "personal_status_sex": {
+    "postprocessAllowedValues": "male (single), female (divorced/separated/married), male (divorced/separated), male (married/widowed)"
+  },
+  "other_debtors": {
+    "postprocessAllowedValues": "none, guarantor, co-applicant"
+  },
+  "present_residence": {
+    "postprocessMinValue": "1",
+    "postprocessMaxValue": "4",
+    "postprocessIntegerOnly": true
+  },
+  "property": {
+    "postprocessAllowedValues": "real estate, building society savings / life insurance, car or other, unknown / no property"
+  },
+  "age": {
+    "postprocessMinValue": "19",
+    "postprocessMaxValue": "75",
+    "postprocessIntegerOnly": true
+  },
+  "other_installment_plans": {
+    "postprocessAllowedValues": "none, bank, stores"
+  },
+  "housing": {
+    "postprocessAllowedValues": "own, for free, rent"
+  },
+  "number_credits": {
+    "postprocessMinValue": "1",
+    "postprocessMaxValue": "4",
+    "postprocessIntegerOnly": true
+  },
+  "job": {
+    "postprocessAllowedValues": "skilled employee, unskilled resident, management / highly qualified / self-employed / officer, unemployed / unskilled non-resident"
+  },
+  "people_liable": {
+    "postprocessMinValue": "1",
+    "postprocessMaxValue": "2",
+    "postprocessIntegerOnly": true
+  },
+  "telephone": {
+    "postprocessAllowedValues": "yes, none"
+  },
+  "foreign_worker": {
+    "postprocessAllowedValues": "yes, no"
+  },
+  "credit risk": {
+    "postprocessAllowedValues": "good, bad"
+  }
+}
