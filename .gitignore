@@ -28,3 +28,4 @@ dist-ssr
 **/workspace
 **/.synthcity_workspace
 **/test-results
+**/downloads/e2e

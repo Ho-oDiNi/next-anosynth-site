@@ -170,7 +170,7 @@ export function useHomePageModel() {
 
     const processedFileName =
       normalizedGenerationMethod.length > 0
-        ? `processed_${normalizedGenerationMethod}_data_${Date.now()}.csv`
+        ? `processed_data_${normalizedGenerationMethod}_${Date.now()}.csv`
         : `processed_data_${Date.now()}.csv`;
 
     downloadTextFile({
@@ -192,7 +192,7 @@ export function useHomePageModel() {
 
     downloadTextFile({
       content: formatEvaluationResultsAsCsv(evaluationReport.rows),
-      fileName: `${evaluationFileNamePrefix}_${evaluationReport.evaluationId}.csv`,
+      fileName: `${evaluationFileNamePrefix}_${Date.now()}.csv`,
       mimeType: "text/csv;charset=utf-8;",
     });
   }, [evaluationReport, normalizedGenerationMethod]);
@@ -208,10 +208,7 @@ export function useHomePageModel() {
         ? `evaluation_${normalizedGenerationMethod}`
         : "evaluation";
 
-    downloadBlob(
-      pngBlob,
-      `${evaluationFileNamePrefix}_${Date.now()}_${evaluationReport.evaluationId}.png`,
-    );
+    downloadBlob(pngBlob, `${evaluationFileNamePrefix}_${Date.now()}.png`);
   }, [evaluationReport, normalizedGenerationMethod]);
 
   return {

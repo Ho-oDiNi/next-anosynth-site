@@ -28,13 +28,13 @@ const SENSITIVE_COLUMNS = [
 ] as const;
 
 const METHODS = [
-  "Байесовские сети",
-  "TVAE",
-  "TGAN",
-  "CTGAN",
-  "DPGAN",
-  "TabDDPM",
-  "Forest-VP",
+  // "Байесовские сети",
+  // "TVAE",
+  // "TGAN",
+  // "CTGAN",
+  // "DPGAN",
+  // "TabDDPM",
+  // "Forest-VP",
   "GREAT",
 ] as const;
 
