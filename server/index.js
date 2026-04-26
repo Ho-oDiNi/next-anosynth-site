@@ -14,10 +14,17 @@ const PYTHON_GENERATE_SCRIPT_PATH = path.resolve(
   PROJECT_ROOT,
   "services/synthcity-engine/app/generate.py",
 );
+
+const PYTHON_FOREST_GENERATE_SCRIPT_PATH = path.resolve(
+  PROJECT_ROOT,
+  "services/forest-engine/app/generate.py",
+);
+
 const PYTHON_SYNTHCITY_EVALUATE_SCRIPT_PATH = path.resolve(
   PROJECT_ROOT,
   "services/synthcity-engine/app/evaluate.py",
 );
+
 const PYTHON_SDMETRICS_EVALUATE_SCRIPT_PATH = path.resolve(
   PROJECT_ROOT,
   "services/sdmetrics-engine/app/evalute.py",
@@ -41,6 +48,24 @@ function resolvePythonExecutable(engineName = "synthcity-engine") {
         `services/${engineName}/.venv/Scripts/python.exe`,
       )
     : path.resolve(PROJECT_ROOT, `services/${engineName}/.venv/bin/python`);
+}
+
+function resolveGenerationEngine(method) {
+  const normalizedMethod = String(method ?? "").trim();
+
+  if (normalizedMethod === "Forest-VP") {
+    return {
+      engineName: "forest-engine",
+      scriptPath: PYTHON_FOREST_GENERATE_SCRIPT_PATH,
+      cwd: path.resolve(PROJECT_ROOT, "services/forest-engine"),
+    };
+  }
+
+  return {
+    engineName: "synthcity-engine",
+    scriptPath: PYTHON_GENERATE_SCRIPT_PATH,
+    cwd: path.resolve(PROJECT_ROOT, "services/synthcity-engine"),
+  };
 }
 
 async function ensurePathExists(targetPath, label) {
@@ -306,20 +331,24 @@ app.get("/health", (_req, res) => {
 
 app.post("/api/generate", async (req, res) => {
   try {
-    const pythonExecutable = resolvePythonExecutable("synthcity-engine");
+    const generationEngine = resolveGenerationEngine(req.body?.method);
+    const pythonExecutable = resolvePythonExecutable(
+      generationEngine.engineName,
+    );
 
     await ensurePathExists(pythonExecutable, "Python executable");
-    await ensurePathExists(PYTHON_GENERATE_SCRIPT_PATH, "Python-скрипт");
+    await ensurePathExists(generationEngine.scriptPath, "Python-скрипт");
 
+    console.log("GENERATION_ENGINE =", generationEngine.engineName);
     console.log("PYTHON_BIN =", pythonExecutable);
     console.log("PYTHON exists =", fs.existsSync(pythonExecutable));
-    console.log("PYTHON_SCRIPT =", PYTHON_GENERATE_SCRIPT_PATH);
-    console.log("SCRIPT exists =", fs.existsSync(PYTHON_GENERATE_SCRIPT_PATH));
+    console.log("PYTHON_SCRIPT =", generationEngine.scriptPath);
+    console.log("SCRIPT exists =", fs.existsSync(generationEngine.scriptPath));
 
     const result = await runPythonWorker({
       pythonExecutable,
-      scriptPath: PYTHON_GENERATE_SCRIPT_PATH,
-      cwd: path.resolve(PROJECT_ROOT, "services/synthcity-engine"),
+      scriptPath: generationEngine.scriptPath,
+      cwd: generationEngine.cwd,
       requestPayload: req.body,
     });
 
@@ -411,6 +440,7 @@ app.post("/api/evaluate", async (req, res) => {
     const mergedResults = responses
       .flatMap((item) => normalizeResultsArray(item.results))
       .map((row) => formatEvaluationRow(row));
+
     const evaluationId =
       responses
         .map((item) => item.evaluationId)

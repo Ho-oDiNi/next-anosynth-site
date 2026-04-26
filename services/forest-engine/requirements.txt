@@ -1,0 +1,6 @@
+ForestDiffusion==1.0.6
+numpy<2
+pandas
+scikit-learn
+xgboost
+joblib
