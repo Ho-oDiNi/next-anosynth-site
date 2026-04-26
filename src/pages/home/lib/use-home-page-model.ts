@@ -159,30 +159,44 @@ export function useHomePageModel() {
   });
 
   const hasData = headers.length > 0;
+  const normalizedGenerationMethod = generationParams.method
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 
   const handleDownload = useCallback(() => {
     if (!hasData) {
       return;
     }
 
+    const processedFileName =
+      normalizedGenerationMethod.length > 0
+        ? `processed_${normalizedGenerationMethod}_data.csv`
+        : "processed_data.csv";
+
     downloadTextFile({
       content: toCsv(headers, data),
-      fileName: "processed_data.csv",
+      fileName: processedFileName,
       mimeType: "text/csv;charset=utf-8;",
     });
-  }, [data, hasData, headers]);
+  }, [data, hasData, headers, normalizedGenerationMethod]);
 
   const handleEvaluationCsvDownload = useCallback(() => {
     if (!evaluationReport || evaluationReport.rows.length === 0) {
       return;
     }
 
+    const evaluationFileNamePrefix =
+      normalizedGenerationMethod.length > 0
+        ? `evaluation_${normalizedGenerationMethod}`
+        : "evaluation";
+
     downloadTextFile({
       content: formatEvaluationResultsAsCsv(evaluationReport.rows),
-      fileName: `evaluation_${evaluationReport.evaluationId}.csv`,
+      fileName: `${evaluationFileNamePrefix}_${evaluationReport.evaluationId}.csv`,
       mimeType: "text/csv;charset=utf-8;",
     });
-  }, [evaluationReport]);
+  }, [evaluationReport, normalizedGenerationMethod]);
 
   const handleEvaluationPngDownload = useCallback(() => {
     if (!evaluationReport || evaluationReport.rows.length === 0) {
@@ -190,8 +204,16 @@ export function useHomePageModel() {
     }
 
     const pngBlob = drawEvaluationResultsAsPng(evaluationReport.rows);
-    downloadBlob(pngBlob, `evaluation_${evaluationReport.evaluationId}.png`);
-  }, [evaluationReport]);
+    const evaluationFileNamePrefix =
+      normalizedGenerationMethod.length > 0
+        ? `evaluation_${normalizedGenerationMethod}`
+        : "evaluation";
+
+    downloadBlob(
+      pngBlob,
+      `${evaluationFileNamePrefix}_${evaluationReport.evaluationId}.png`,
+    );
+  }, [evaluationReport, normalizedGenerationMethod]);
 
   return {
     headers,
