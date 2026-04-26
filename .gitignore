@@ -27,3 +27,4 @@ dist-ssr
 **/__pycache__
 **/workspace
 **/.synthcity_workspace
+**/test-results

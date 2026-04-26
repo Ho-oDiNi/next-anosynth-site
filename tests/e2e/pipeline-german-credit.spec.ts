@@ -11,7 +11,16 @@ const SENSITIVE_COLUMNS = [
   "savings_account",
 ] as const;
 
-const METHODS = ["CTGAN", "TVAE", "TabDDPM"] as const;
+const METHODS = [
+  "Байесовские сети",
+  "TVAE",
+  "TGAN",
+  "CTGAN",
+  "DPGAN",
+  "TabDDPM",
+  "Forest-VP",
+  "GREAT",
+] as const;
 
 const COLUMN_CONSTRAINTS: Record<string, Record<string, string | boolean>> = {
   checking_account_status: {
