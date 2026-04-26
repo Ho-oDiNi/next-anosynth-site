@@ -29,13 +29,13 @@ const SENSITIVE_COLUMNS = [
 
 const METHODS = [
   "Байесовские сети",
-  // "TVAE",
-  // "TGAN",
-  // "CTGAN",
-  // "DPGAN",
-  // "TabDDPM",
-  // "Forest-VP",
-  // "GREAT",
+  "TVAE",
+  "TGAN",
+  "CTGAN",
+  "DPGAN",
+  "TabDDPM",
+  "Forest-VP",
+  "GREAT",
 ] as const;
 
 const COLUMN_CONSTRAINTS: Record<string, Record<string, string | boolean>> = {
