@@ -210,7 +210,7 @@ export function useHomePageModel() {
 
     downloadBlob(
       pngBlob,
-      `${evaluationFileNamePrefix}_${evaluationReport.evaluationId}.png`,
+      `${evaluationFileNamePrefix}_${Date.now()}_${evaluationReport.evaluationId}.png`,
     );
   }, [evaluationReport, normalizedGenerationMethod]);
 
