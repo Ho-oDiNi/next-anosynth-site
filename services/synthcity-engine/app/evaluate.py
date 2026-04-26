@@ -710,9 +710,11 @@ def evaluate_constraint_violation_metrics(
     violated_by_constraint = violations_by_constraint.any(axis=0)
     violation_rate_by_constraint = violations_by_constraint.mean(axis=0)
 
-    cvr_score = float(violated_by_row.mean())
-    cvc_score = float(violated_by_constraint.mean())
-    scvc_score = float(violation_rate_by_constraint.mean())
+    # Return validity scores, not violation rates:
+    # 1.0 means all checked constraints are satisfied, 0.0 means all are violated.
+    cvr_score = 1.0 - float(violated_by_row.mean())
+    cvc_score = 1.0 - float(violated_by_constraint.mean())
+    scvc_score = 1.0 - float(violation_rate_by_constraint.mean())
 
     return {
         "cvr": max(0.0, min(1.0, cvr_score)),
@@ -1439,7 +1441,12 @@ def evaluate_single_metric(
 
     if group == "sanity":
         if metric_name in {"cvr", "cvc", "scvc"}:
-            real_df, synth_df = prepare_tabular_pair(real_df_raw, synth_df_raw, column_meta, fillna=False)
+            # CVR/CVC/sCVC must be calculated on the original values.
+            # prepare_tabular_pair encodes categorical values into numbers, which breaks
+            # postprocessAllowedValues checks based on string categories.
+            real_df = real_df_raw.copy()
+            synth_df = synth_df_raw.copy()
+
             constraint_scores = evaluate_constraint_violation_metrics(
                 synth_df=synth_df,
                 column_meta=column_meta,
