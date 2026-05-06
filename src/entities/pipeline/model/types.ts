@@ -99,7 +99,7 @@ export const defaultEvaluation: EvaluationParams = {
   lDiversity: true,
   dataLeakage: { linear: true, xgboost: true, mlp: true },
   deltaPresence: true,
-  domias: { kde: true, prior: true, bnaf: true },
+  domias: { kde: true, prior: true, bnaf: false },
 };
 
 export function getStepLabel(step: StepName): string {

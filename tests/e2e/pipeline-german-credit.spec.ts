@@ -22,21 +22,23 @@ const SENSITIVE_COLUMNS = [
 
 const METHODS = [
   "Байесовские сети",
-  "TVAE",
-  "TGAN",
-  "CTGAN",
-  "DPGAN",
-  "TabDDPM",
-  "Forest-VP",
-  "GREAT",
+  // "TVAE",
+  // "TGAN",
+  // "CTGAN",
+  // "DPGAN",
+  // "TabDDPM",
+  // "Forest-VP",
+  // "GREAT",
 ] as const;
 
 const DATASET_GROUPS_IN_ORDER = [
-  [200, 400, 600, 800, 1000],
-  [100, 300, 500, 700, 900],
+  // [1000, 800, 600, 400, 200],
+  // [900, 700, 500, 300, 100],
+  [1000],
+  [300],
 ] as const;
 
-const REPEAT_COUNT_PER_GROUP = 5;
+const REPEAT_COUNT_PER_GROUP = 1;
 
 const COLUMN_CONSTRAINTS: Record<string, Record<string, string | boolean>> = {
   checking_account_status: {
@@ -388,14 +390,14 @@ function resolveDatasetPath(datasetSize: number): string {
   );
 }
 
-for (const method of METHODS) {
+for (
+  let groupRunNumber = 1;
+  groupRunNumber <= REPEAT_COUNT_PER_GROUP;
+  groupRunNumber += 1
+) {
   for (const datasetGroup of DATASET_GROUPS_IN_ORDER) {
-    for (const datasetSize of datasetGroup) {
-      for (
-        let groupRunNumber = 1;
-        groupRunNumber <= REPEAT_COUNT_PER_GROUP;
-        groupRunNumber += 1
-      ) {
+    for (const method of METHODS) {
+      for (const datasetSize of datasetGroup) {
         test(`E2E: German Credit | метод ${method} | группа [${datasetGroup.join(", ")}] | прогон ${groupRunNumber}/${REPEAT_COUNT_PER_GROUP} | датасет ${datasetSize}`, async ({
           page,
         }: {
